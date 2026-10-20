@@ -189,56 +189,79 @@
     });
   });
 
-    /* ---------- Pratinjau gambar sampul + validasi + tombol hapus ---------- */
+    /* ---------- Area unggah gambar: tarik-lepas, pratinjau, ganti & hapus ---------- */
   d.querySelectorAll('input[type=file]').forEach(function (inp) {
-    var box = d.createElement('div');
-    box.className = 'wn-preview';
-    box.hidden = true;
-    inp.parentNode.appendChild(box);
+    var wrap = d.createElement('div');
+    wrap.className = 'wn-drop';
+    wrap.innerHTML =
+      '<div class="wn-drop-empty">' +
+        '<div class="wn-drop-icon"><i class="bi bi-cloud-arrow-up"></i></div>' +
+        '<strong>Tarik &amp; lepas gambar di sini</strong>' +
+        '<span>atau <u>klik untuk memilih file</u></span>' +
+        '<small>JPG / PNG &bull; maksimal 2MB</small>' +
+      '</div>' +
+      '<div class="wn-drop-preview" hidden>' +
+        '<img alt="Pratinjau gambar sampul">' +
+        '<span class="wn-drop-ok"><i class="bi bi-check-circle-fill"></i> Siap diunggah</span>' +
+        '<div class="wn-drop-bar">' +
+          '<div class="wn-drop-meta"><strong></strong><small></small></div>' +
+          '<button type="button" class="wn-drop-btn" data-act="ganti"><i class="bi bi-arrow-repeat"></i> Ganti</button>' +
+          '<button type="button" class="wn-drop-btn danger" data-act="hapus"><i class="bi bi-trash3"></i> Hapus</button>' +
+        '</div>' +
+      '</div>';
+
+    // input asli dipindah ke dalam area & ditumpuk transparan di atasnya (klik + drop jalan native)
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.insertBefore(inp, wrap.firstChild);
+    var hint = wrap.nextElementSibling;
+    if (hint && hint.tagName === 'SMALL') hint.hidden = true;   // petunjuk lama sudah ada di dalam area
+
+    var preview = wrap.querySelector('.wn-drop-preview');
+    var img = preview.querySelector('img');
     var objectUrl = null;
 
-    // Kosongkan pilihan file & sembunyikan pratinjau
     function clearFile() {
       inp.value = '';
       if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-      box.hidden = true;
-      box.innerHTML = '';
+      img.removeAttribute('src');
+      preview.hidden = true;
+      wrap.classList.remove('has-file');
     }
 
     ['dragenter', 'dragover'].forEach(function (ev) {
-      inp.addEventListener(ev, function () { inp.classList.add('is-dragover'); });
+      inp.addEventListener(ev, function () { wrap.classList.add('is-over'); });
     });
     ['dragleave', 'drop'].forEach(function (ev) {
-      inp.addEventListener(ev, function () { inp.classList.remove('is-dragover'); });
+      inp.addEventListener(ev, function () { wrap.classList.remove('is-over'); });
     });
 
     inp.addEventListener('change', function () {
       var f = inp.files && inp.files[0];
-      if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
-      box.hidden = true;
-      box.innerHTML = '';
-      if (!f) return;
-
+      if (!f) { clearFile(); return; }
       if (!/^image\/(jpeg|png)$/.test(f.type)) { toast('Format gambar harus JPG atau PNG.', 'error'); clearFile(); return; }
       if (f.size > 2000000) { toast('Ukuran gambar maksimal 2MB.', 'error'); clearFile(); return; }
 
-      box.innerHTML =
-        '<img alt="Pratinjau gambar">' +
-        '<div class="wn-preview-info"><strong></strong><small></small></div>' +
-        '<button type="button" class="wn-preview-remove" aria-label="Hapus gambar" title="Hapus gambar"><i class="bi bi-x-lg"></i></button>';
-
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
       objectUrl = URL.createObjectURL(f);
-      box.querySelector('img').src = objectUrl;
-      box.querySelector('strong').textContent = f.name;
-      box.querySelector('small').textContent = Math.max(1, Math.round(f.size / 1024)) + ' KB';
-      box.querySelector('.wn-preview-remove').addEventListener('click', function () {
-        clearFile();
-        toast('Gambar dibatalkan, silakan pilih ulang.');
-      });
-      box.hidden = false;
+      var kb = Math.max(1, Math.round(f.size / 1024)) + ' KB';
+      var info = preview.querySelector('small');
+      info.textContent = kb;
+      img.onload = function () { info.textContent = kb + ' \u2022 ' + img.naturalWidth + '\u00D7' + img.naturalHeight + ' px'; };
+      img.src = objectUrl;
+      preview.querySelector('.wn-drop-meta strong').textContent = f.name;
+      preview.hidden = false;
+      wrap.classList.add('has-file');
+    });
+
+    preview.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]');
+      if (!b) return;
+      if (b.getAttribute('data-act') === 'ganti') { inp.click(); }
+      else { clearFile(); toast('Gambar dibatalkan, silakan pilih ulang.'); }
     });
   });
 
+  
   /* ---------- Penghitung kata + tinggi otomatis pada isi artikel ---------- */
   var ta = d.querySelector('textarea[name=isi_artikel]');
   if (ta) {
