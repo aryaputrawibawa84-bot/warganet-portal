@@ -27,25 +27,29 @@ $query_berita = mysqli_query($koneksi, "
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="dark">
 <head>
+    <head>
     <meta charset="UTF-8">
+    <meta name="theme-color" content="#0B1120">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kategori Berita - WargaNet</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <style>
-        body { background-color: #0F172A; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .navbar-glass { background: rgba(15, 23, 42, 0.8) !important; backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-        .card-dark { background-color: #1E293B; border: 1px solid rgba(255, 255, 255, 0.05); transition: transform 0.3s; }
-        .card-dark:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4); }
-        .card-img-top { height: 200px; object-fit: cover; }
-        .text-truncate-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/warganet.css">
+    <script>document.documentElement.classList.add('js')</script>
 </head>
-<body>
+</head>
+<body class="wn-public">
 
     <!-- NAVBAR PUBLIC -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-glass sticky-top py-3">
         <div class="container">
             <a class="navbar-brand fw-bold text-info" href="index.php"><i class="bi bi-activity me-1"></i> WargaNet</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-label="Menu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item"><a class="nav-link" href="index.php">Beranda</a></li>
@@ -93,5 +97,16 @@ $query_berita = mysqli_query($koneksi, "
             <?php endif; ?>
         </div>
     </div>
+    
+    <footer class="wn-footer">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <span class="brand"><i class="bi bi-activity me-1"></i>WargaNet</span>
+            <span>&copy; <?= date('Y'); ?> WargaNet &mdash; Suara warga, inspirasi bersama.</span>
+            <nav class="d-flex gap-3"><a href="index.php">Beranda</a><a href="kategori.php">Kategori</a><a href="tentang.php">Tentang</a></nav>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/warganet.js"></script>
 </body>
 </html>

@@ -13,6 +13,12 @@ $query_hero = mysqli_query($koneksi, "
 ");
 $hero = mysqli_fetch_assoc($query_hero);
 
+// Statistik & daftar kategori untuk hero pembuka
+$stat_artikel = (int) mysqli_fetch_row(mysqli_query($koneksi, "SELECT COUNT(*) FROM artikel WHERE status = 'terbit'"))[0];
+$stat_kategori = (int) mysqli_fetch_row(mysqli_query($koneksi, "SELECT COUNT(*) FROM kategori"))[0];
+$stat_penulis = (int) mysqli_fetch_row(mysqli_query($koneksi, "SELECT COUNT(DISTINCT id_user) FROM artikel WHERE status = 'terbit'"))[0];
+$query_chip = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY nama_kategori LIMIT 8");
+
 // Ambil 6 artikel lainnya untuk Grid Berita (Lewati 1 artikel yang sudah jadi Hero)
 $query_berita = mysqli_query($koneksi, "
     SELECT artikel.*, kategori.nama_kategori, users.nama_lengkap 
@@ -25,70 +31,20 @@ $query_berita = mysqli_query($koneksi, "
 ?>
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="dark">
+    
 <head>
-    <meta charset="UTF-8">
+    <meta name="theme-color" content="#0B1120">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WargaNet - Portal Berita & Komunitas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <style>
-        body { background-color: #0F172A; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
-        /* Glassmorphism Navbar */
-        .navbar-glass {
-            background: rgba(15, 23, 42, 0.8) !important;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Hero Banner Styling */
-        .hero-banner {
-            position: relative;
-            height: 500px;
-            border-radius: 16px;
-            overflow: hidden;
-            background-color: #1E293B;
-            display: flex;
-            align-items: flex-end;
-        }
-        .hero-img {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover;
-        }
-        .hero-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(to top, rgba(15, 23, 42, 1) 0%, rgba(15, 23, 42, 0.2) 100%);
-        }
-        .hero-content {
-            position: relative;
-            z-index: 2;
-            padding: 40px;
-            width: 100%;
-        }
-
-        /* Card Styling */
-        .card-dark {
-            background-color: #1E293B;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card-dark:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
-        }
-        .card-img-top { height: 200px; object-fit: cover; }
-        .text-truncate-3 {
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/warganet.css">
+    <script>document.documentElement.classList.add('js')</script>
 </head>
-<body>
+<body class="wn-public">
 
     <!-- NAVBAR PUBLIC -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-glass sticky-top py-3">
@@ -118,7 +74,32 @@ $query_berita = mysqli_query($koneksi, "
         </div>
     </nav>
 
-    <div class="container my-5">
+    <!-- HERO PEMBUKA -->
+    <header class="wn-intro">
+        <div class="container text-center">
+            <span class="wn-pill"><span class="wn-dot"></span> Portal berita &amp; komunitas warga</span>
+            <h1 class="wn-title">Kabar dari warga,<br><span class="wn-grad-text">untuk semua warga.</span></h1>
+            <p class="wn-lead">Satu pintu untuk berita, pengumuman, dan cerita dari lingkungan sekitar. Baca, bagikan, dan jadi bagian dari suara warga.</p>
+            <div class="d-flex gap-3 justify-content-center flex-wrap">
+                <a href="kategori.php" class="btn btn-primary btn-lg rounded-pill px-5">Jelajahi berita <i class="bi bi-arrow-right ms-1"></i></a>
+                <?php if(!isset($_SESSION['id_user'])) : ?>
+                <a href="register.php" class="btn btn-outline-secondary btn-lg rounded-pill px-5">Jadi kontributor</a>
+                <?php endif; ?>
+            </div>
+            <div class="wn-chips">
+                <?php while($chip = mysqli_fetch_assoc($query_chip)) : ?>
+                    <a href="kategori.php?id=<?= $chip['id_kategori']; ?>"># <?= htmlspecialchars($chip['nama_kategori']); ?></a>
+                <?php endwhile; ?>
+            </div>
+            <div class="wn-stats">
+                <div class="wn-stat"><b data-count="<?= $stat_artikel; ?>">0</b><span>Berita terbit</span></div>
+                <div class="wn-stat"><b data-count="<?= $stat_kategori; ?>">0</b><span>Kategori</span></div>
+                <div class="wn-stat"><b data-count="<?= $stat_penulis; ?>">0</b><span>Penulis aktif</span></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mb-5 mt-4">
         
         <!-- SECTION 1: HERO BANNER (Artikel Terbaru) -->
         <?php if ($hero) : ?>
@@ -177,6 +158,15 @@ $query_berita = mysqli_query($koneksi, "
 
     </div>
 
+    <footer class="wn-footer">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <span class="brand"><i class="bi bi-activity me-1"></i>WargaNet</span>
+            <span>&copy; <?= date('Y'); ?> WargaNet &mdash; Suara warga, inspirasi bersama.</span>
+            <nav class="d-flex gap-3"><a href="index.php">Beranda</a><a href="kategori.php">Kategori</a><a href="tentang.php">Tentang</a></nav>
+        </div>
+    </footer>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/warganet.js"></script>
 </body>
 </html>

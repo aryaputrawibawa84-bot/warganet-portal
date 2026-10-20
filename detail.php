@@ -28,45 +28,20 @@ if (mysqli_num_rows($query_detail) == 0) {
 $data = mysqli_fetch_assoc($query_detail);
 ?>
 <!DOCTYPE html>
-<html lang="id" data-bs-theme="dark">
+<html lang="id" data-bs-theme="dark">  
 <head>
-    <meta charset="UTF-8">
+    <meta name="theme-color" content="#0B1120">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $data['judul']; ?> - WargaNet</title>
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
-    <style>
-        body { 
-            background-color: #0F172A; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            color: #e2e8f0; 
-        }
-        
-        .navbar-glass {
-            background: rgba(15, 23, 42, 0.8) !important;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .article-img {
-            width: 100%;
-            max-height: 500px;
-            object-fit: cover;
-            border-radius: 16px;
-        }
-
-        .content-text {
-            font-size: 1.15rem;
-            line-height: 1.8;
-            color: #cbd5e1;
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/warganet.css">
+    <script>document.documentElement.classList.add('js')</script>
 </head>
-<body>
+<body class="wn-public">
 
     <!-- NAVBAR PUBLIC -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-glass sticky-top py-3">
@@ -120,5 +95,15 @@ $data = mysqli_fetch_assoc($query_detail);
         </div>
     </div>
 
+    <footer class="wn-footer">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <span class="brand"><i class="bi bi-activity me-1"></i>WargaNet</span>
+            <span>&copy; <?= date('Y'); ?> WargaNet &mdash; Suara warga, inspirasi bersama.</span>
+            <nav class="d-flex gap-3"><a href="index.php">Beranda</a><a href="kategori.php">Kategori</a><a href="tentang.php">Tentang</a></nav>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/warganet.js"></script>
 </body>
 </html>

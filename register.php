@@ -42,121 +42,21 @@ if (isset($_POST['register'])) {
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="dark">
 <head>
+    <head>
     <meta charset="UTF-8">
+    <meta name="theme-color" content="#0B1120">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daftar Akun - WargaNet</title>
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
-    <style>
-        body { 
-            background-color: #0B1120; 
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        .login-wrapper {
-            background-color: #172133; 
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            max-width: 1000px;
-            width: 100%;
-            margin: 20px;
-        }
-
-        .left-panel {
-            background: linear-gradient(145deg, #1e3a8a 0%, #0f172a 100%);
-            padding: 50px;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .right-panel {
-            padding: 50px;
-        }
-
-        /* Toggle Button Masuk / Daftar */
-        .nav-toggle {
-            background-color: #0B1120;
-            border-radius: 8px;
-            padding: 4px;
-            display: flex;
-            margin-bottom: 30px;
-            width: fit-content;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        
-        .nav-toggle a {
-            padding: 8px 30px;
-            color: #94a3b8;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s;
-        }
-        
-        .nav-toggle a.active {
-            background-color: #1e293b;
-            color: white;
-        }
-
-        /* Input Kustom */
-        .input-group-text {
-            background-color: #0B1120;
-            border: 1px solid #334155;
-            border-right: none;
-            color: #64748b;
-        }
-
-        .form-control {
-            background-color: #0B1120;
-            border: 1px solid #334155;
-            border-left: none;
-            color: white;
-            padding: 12px 12px 12px 0;
-        }
-
-        .form-control:focus {
-            background-color: #0B1120;
-            color: white;
-            box-shadow: none;
-            border-color: #334155;
-        }
-
-        .input-group:focus-within .input-group-text,
-        .input-group:focus-within .form-control {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-        }
-
-        .btn-primary {
-            background-color: #3b82f6;
-            border: none;
-            padding: 12px;
-            font-weight: 500;
-            border-radius: 8px;
-        }
-        
-        .btn-primary:hover {
-            background-color: #2563eb;
-        }
-
-        .text-small {
-            font-size: 0.85rem;
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/warganet.css">
+    <script>document.documentElement.classList.add('js')</script>
 </head>
-<body>
+</head>
+<body class="wn-auth">
 
     <div class="login-wrapper d-flex flex-wrap flex-md-nowrap">
         
@@ -257,5 +157,6 @@ if (isset($_POST['register'])) {
 
     </div>
 
+    <script src="assets/js/warganet.js"></script>
 </body>
 </html>

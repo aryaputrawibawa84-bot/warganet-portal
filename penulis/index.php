@@ -30,15 +30,19 @@ $result = mysqli_query($koneksi, $query_artikel);
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="dark">
 <head>
-    <meta charset="UTF-8">
+    <meta name="theme-color" content="#0B1120">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ruang Redaksi - WargaNet</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #0F172A; }
-        .card-dark { background-color: #1E293B; border: none; }
-    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../assets/css/warganet.css">
+    <script>document.documentElement.classList.add('js')</script>
 </head>
-<body>
+<body class="wn-panel">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 border-bottom border-secondary">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold text-info" href="#">WargaNet | Ruang Penulis</a>
@@ -104,5 +108,6 @@ $result = mysqli_query($koneksi, $query_artikel);
             </div>
         </div>
     </div>
+    <script src="../assets/js/warganet.js"></script>
 </body>
 </html>
