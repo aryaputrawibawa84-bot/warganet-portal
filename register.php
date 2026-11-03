@@ -1,6 +1,12 @@
 <?php
+$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+session_set_cookie_params([
+    'lifetime' => 0, 'path' => '/', 'secure' => $https,
+    'httponly' => true, 'samesite' => 'Lax'
+]);
 session_start();
-require 'koneksi.php';
+require_once __DIR__ . '/includes/security.php';
+require_once __DIR__ . '/koneksi.php';
 
 // Jika sudah login, tidak boleh buka halaman register
 if (isset($_SESSION['id_user'])) {
@@ -12,29 +18,54 @@ $pesan_error = "";
 $pesan_sukses = "";
 
 if (isset($_POST['register'])) {
-    $nama_lengkap = mysqli_real_escape_string($koneksi, $_POST['nama_lengkap']);
-    $username = mysqli_real_escape_string($koneksi, $_POST['username']);
-    $password = mysqli_real_escape_string($koneksi, $_POST['password']);
-    $konfirmasi_password = mysqli_real_escape_string($koneksi, $_POST['konfirmasi_password']);
+    require_csrf();
+    $nama_lengkap = trim((string)($_POST['nama_lengkap'] ?? ''));
+    $username = trim((string)($_POST['username'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
+    $konfirmasi_password = (string)($_POST['konfirmasi_password'] ?? '');
 
-    // Cek apakah username sudah dipakai
-    $cek_username = mysqli_query($koneksi, "SELECT username FROM users WHERE username = '$username'");
-
-    if (mysqli_num_rows($cek_username) > 0) {
-        $pesan_error = "Username sudah terdaftar, silakan gunakan yang lain!";
+    if ($nama_lengkap === '' || mb_strlen($nama_lengkap) > 100) {
+        $pesan_error = 'Nama lengkap wajib diisi dan maksimal 100 karakter.';
+    } elseif (!preg_match('/^[A-Za-z0-9_.-]{3,50}$/', $username)) {
+        $pesan_error = 'Username harus 3–50 karakter dan hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.';
+    } elseif (strlen($password) < 8 || strlen($password) > 4096) {
+        $pesan_error = 'Kata sandi harus minimal 8 karakter.';
     } elseif ($password !== $konfirmasi_password) {
-        $pesan_error = "Konfirmasi kata sandi tidak cocok!";
+        $pesan_error = 'Konfirmasi kata sandi tidak cocok!';
     } else {
-        // Enkripsi password sebelum disimpan
-        $password_hashed = password_hash($password, PASSWORD_DEFAULT);
-        
-        // Insert data (role otomatis menjadi 'pembaca' sesuai setelan default database)
-        $query = "INSERT INTO users (nama_lengkap, username, password) VALUES ('$nama_lengkap', '$username', '$password_hashed')";
-        
-        if (mysqli_query($koneksi, $query)) {
-            $pesan_sukses = "Pendaftaran berhasil! Silakan masuk dengan akun baru Anda.";
+        $stmt = mysqli_prepare($koneksi, 'SELECT id_user FROM users WHERE username = ? LIMIT 1');
+        if (!$stmt) {
+            error_log('WargaNet could not prepare username lookup.');
+            $pesan_error = 'Pendaftaran belum dapat diproses. Silakan coba kembali.';
         } else {
-            $pesan_error = "Gagal mendaftar: " . mysqli_error($koneksi);
+            mysqli_stmt_bind_param($stmt, 's', $username);
+            mysqli_stmt_execute($stmt);
+            $result = mysqli_stmt_get_result($stmt);
+            $exists = $result && mysqli_num_rows($result) > 0;
+            mysqli_stmt_close($stmt);
+
+            if ($exists) {
+                $pesan_error = 'Username sudah terdaftar, silakan gunakan yang lain!';
+            } else {
+                $password_hashed = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = mysqli_prepare($koneksi, 'INSERT INTO users (nama_lengkap, username, password) VALUES (?, ?, ?)');
+                if ($stmt) {
+                    mysqli_stmt_bind_param($stmt, 'sss', $nama_lengkap, $username, $password_hashed);
+                    if (mysqli_stmt_execute($stmt)) {
+                        $pesan_sukses = 'Pendaftaran berhasil! Silakan masuk dengan akun baru Anda.';
+                    } else {
+                        // 1062 = duplicate key; tangani aman jika dua pendaftaran bersamaan.
+                        $pesan_error = mysqli_stmt_errno($stmt) === 1062
+                            ? 'Username sudah terdaftar, silakan gunakan yang lain!'
+                            : 'Pendaftaran gagal diproses. Silakan coba kembali.';
+                        error_log('WargaNet registration insert failed, errno=' . mysqli_stmt_errno($stmt));
+                    }
+                    mysqli_stmt_close($stmt);
+                } else {
+                    error_log('WargaNet could not prepare registration insert.');
+                    $pesan_error = 'Pendaftaran belum dapat diproses. Silakan coba kembali.';
+                }
+            }
         }
     }
 }
@@ -42,7 +73,6 @@ if (isset($_POST['register'])) {
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="dark">
 <head>
-    <head>
     <meta charset="UTF-8">
     <meta name="theme-color" content="#0B1120">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -54,7 +84,6 @@ if (isset($_POST['register'])) {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/warganet.css">
     <script>document.documentElement.classList.add('js')</script>
-</head>
 </head>
 <body class="wn-auth">
 
@@ -100,22 +129,23 @@ if (isset($_POST['register'])) {
 
                 <?php if ($pesan_error != "") : ?>
                     <div class="alert alert-danger py-2 border-danger bg-transparent text-danger text-small">
-                        <i class="bi bi-exclamation-triangle me-2"></i><?= $pesan_error; ?>
+                        <i class="bi bi-exclamation-triangle me-2"></i><?= e($pesan_error); ?>
                     </div>
                 <?php endif; ?>
 
                 <?php if ($pesan_sukses != "") : ?>
                     <div class="alert alert-success py-2 border-success bg-transparent text-success text-small">
-                        <i class="bi bi-check-circle me-2"></i><?= $pesan_sukses; ?>
+                        <i class="bi bi-check-circle me-2"></i><?= e($pesan_sukses); ?>
                     </div>
                 <?php endif; ?>
 
                 <form action="" method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()); ?>">
                     <div class="mb-3">
                         <label class="form-label text-secondary text-small mb-1">Nama Lengkap</label>
                         <div class="input-group">
                             <span class="input-group-text rounded-start-2"><i class="bi bi-person-vcard"></i></span>
-                            <input type="text" class="form-control rounded-end-2" name="nama_lengkap" placeholder="Contoh: Arya Putra" required autocomplete="off">
+                            <input type="text" class="form-control rounded-end-2" name="nama_lengkap" placeholder="Contoh: Arya Putra" required autocomplete="name" maxlength="100">
                         </div>
                     </div>
 
@@ -123,7 +153,7 @@ if (isset($_POST['register'])) {
                         <label class="form-label text-secondary text-small mb-1">Username</label>
                         <div class="input-group">
                             <span class="input-group-text rounded-start-2"><i class="bi bi-at"></i></span>
-                            <input type="text" class="form-control rounded-end-2" name="username" placeholder="Gunakan nama tanpa spasi" required autocomplete="off">
+                            <input type="text" class="form-control rounded-end-2" name="username" placeholder="Gunakan nama tanpa spasi" required autocomplete="username" minlength="3" maxlength="50" pattern="[A-Za-z0-9_.-]+">
                         </div>
                     </div>
 
@@ -132,14 +162,14 @@ if (isset($_POST['register'])) {
                             <label class="form-label text-secondary text-small mb-1">Kata sandi</label>
                             <div class="input-group">
                                 <span class="input-group-text rounded-start-2"><i class="bi bi-lock"></i></span>
-                                <input type="password" class="form-control rounded-end-2" name="password" placeholder="••••••••" required>
+                                <input type="password" class="form-control rounded-end-2" name="password" placeholder="Minimal 8 karakter" required minlength="8" autocomplete="new-password">
                             </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-secondary text-small mb-1">Konfirmasi sandi</label>
                             <div class="input-group">
                                 <span class="input-group-text rounded-start-2"><i class="bi bi-check2-circle"></i></span>
-                                <input type="password" class="form-control rounded-end-2" name="konfirmasi_password" placeholder="••••••••" required>
+                                <input type="password" class="form-control rounded-end-2" name="konfirmasi_password" placeholder="Ulangi kata sandi" required minlength="8" autocomplete="new-password">
                             </div>
                         </div>
                     </div>

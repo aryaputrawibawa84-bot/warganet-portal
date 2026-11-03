@@ -1,39 +1,27 @@
 <?php
+$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+session_set_cookie_params(['lifetime'=>0,'path'=>'/','secure'=>$https,'httponly'=>true,'samesite'=>'Lax']);
 session_start();
+require_once '../includes/security.php';
 require '../koneksi.php';
-
-// Pastikan hanya admin yang bisa mengeksekusi file ini
 if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'admin') {
-    header("Location: ../login.php");
-    exit;
+    header('Location: ../login.php'); exit;
 }
-
-// Cek apakah parameter ID artikel dikirim melalui URL
-if (isset($_GET['id'])) {
-    $id_artikel = mysqli_real_escape_string($koneksi, $_GET['id']);
-
-    // 1. Ambil nama file gambar dari database sebelum data dihapus
-    $query_gambar = mysqli_query($koneksi, "SELECT gambar FROM artikel WHERE id_artikel = '$id_artikel'");
-    $data_gambar = mysqli_fetch_assoc($query_gambar);
-    
-    // 2. Hapus file gambar fisik dari folder uploads (mencegah penumpukan file sampah)
-    if ($data_gambar && file_exists('../uploads/' . $data_gambar['gambar'])) {
-        unlink('../uploads/' . $data_gambar['gambar']);
-    }
-
-    // 3. Eksekusi query hapus data artikel dari tabel database
-    $hapus = mysqli_query($koneksi, "DELETE FROM artikel WHERE id_artikel = '$id_artikel'");
-
-    if ($hapus) {
-        // Jika berhasil, kembalikan admin ke halaman dasbor
-        header("Location: index.php");
-        exit;
-    } else {
-        echo "Gagal menghapus data: " . mysqli_error($koneksi);
-    }
-} else {
-    // Jika file diakses langsung tanpa ID, lempar kembali ke dasbor
-    header("Location: index.php");
-    exit;
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: index.php'); exit;
 }
-?>
+require_csrf();
+$id = valid_positive_int($_POST['id_artikel'] ?? null);
+if ($id === null) { header('Location: index.php'); exit; }
+$stmt = mysqli_prepare($koneksi, 'SELECT gambar FROM artikel WHERE id_artikel = ? LIMIT 1');
+mysqli_stmt_bind_param($stmt, 'i', $id); mysqli_stmt_execute($stmt);
+$res = mysqli_stmt_get_result($stmt); $row = $res ? mysqli_fetch_assoc($res) : null; mysqli_stmt_close($stmt);
+$del = mysqli_prepare($koneksi, 'DELETE FROM artikel WHERE id_artikel = ?');
+mysqli_stmt_bind_param($del, 'i', $id); $ok = mysqli_stmt_execute($del); mysqli_stmt_close($del);
+if ($ok && $row && !empty($row['gambar'])) {
+    $name = basename((string)$row['gambar']);
+    $path = realpath(__DIR__ . '/../uploads');
+    $file = $path ? realpath($path . DIRECTORY_SEPARATOR . $name) : false;
+    if ($path && $file && strpos($file, $path . DIRECTORY_SEPARATOR) === 0 && is_file($file)) { @unlink($file); }
+}
+header('Location: index.php'); exit;

@@ -1,5 +1,11 @@
 <?php
+$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+session_set_cookie_params([
+    'lifetime' => 0, 'path' => '/', 'secure' => $https,
+    'httponly' => true, 'samesite' => 'Lax'
+]);
 session_start();
+require_once '../includes/security.php';
 require '../koneksi.php';
 
 // Proteksi halaman, hanya admin yang boleh masuk
@@ -10,32 +16,41 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'admin') {
 
 $pesan = "";
 
-// Logika untuk mengubah Role (Naik pangkat / Turun pangkat)
-if (isset($_POST['ubah_role'])) {
-    $id_target = $_POST['id_user'];
-    $role_baru = $_POST['role_baru'];
-    
-    $update = mysqli_query($koneksi, "UPDATE users SET role = '$role_baru' WHERE id_user = '$id_target'");
-    if ($update) {
-        $pesan = "<div class='alert alert-success py-2'>Hak akses pengguna berhasil diperbarui!</div>";
-    } else {
-        $pesan = "<div class='alert alert-danger py-2'>Gagal memperbarui data.</div>";
-    }
-}
-
-// Logika untuk menghapus pengguna
-if (isset($_GET['hapus'])) {
-    $id_hapus = $_GET['hapus'];
-    // Cegah admin menghapus dirinya sendiri
-    if ($id_hapus != $_SESSION['id_user']) {
-        mysqli_query($koneksi, "DELETE FROM users WHERE id_user = '$id_hapus'");
-        header("Location: pengguna.php");
-        exit;
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
+    if (isset($_POST['ubah_role'])) {
+        $id_target = valid_positive_int($_POST['id_user'] ?? null);
+        $role_baru = (string)($_POST['role_baru'] ?? '');
+        $allowed_roles = ['pembaca', 'penulis', 'admin'];
+        if ($id_target === null || !in_array($role_baru, $allowed_roles, true)) {
+            $pesan = "<div class='alert alert-danger py-2'>Data perubahan tidak valid.</div>";
+        } elseif ($id_target === (int)$_SESSION['id_user'] && $role_baru !== 'admin') {
+            $pesan = "<div class='alert alert-warning py-2'>Peran akun admin yang sedang digunakan tidak dapat diturunkan dari halaman ini.</div>";
+        } else {
+            $stmt = mysqli_prepare($koneksi, 'UPDATE users SET role = ? WHERE id_user = ?');
+            mysqli_stmt_bind_param($stmt, 'si', $role_baru, $id_target);
+            $ok = mysqli_stmt_execute($stmt); mysqli_stmt_close($stmt);
+            $pesan = $ok ? "<div class='alert alert-success py-2'>Hak akses pengguna berhasil diperbarui!</div>" : "<div class='alert alert-danger py-2'>Gagal memperbarui data.</div>";
+        }
+    } elseif (isset($_POST['hapus_user'])) {
+        $id_hapus = valid_positive_int($_POST['id_user'] ?? null);
+        if ($id_hapus === null || $id_hapus === (int)$_SESSION['id_user']) {
+            $pesan = "<div class='alert alert-warning py-2'>Akun tidak valid atau tidak dapat menghapus akun sendiri.</div>";
+        } else {
+            $stmt = mysqli_prepare($koneksi, 'DELETE FROM users WHERE id_user = ?');
+            mysqli_stmt_bind_param($stmt, 'i', $id_hapus);
+            $ok = mysqli_stmt_execute($stmt); mysqli_stmt_close($stmt);
+            header('Location: pengguna.php'); exit;
+        }
     }
 }
 
 // Ambil semua data pengguna kecuali admin yang sedang login
-$query_users = mysqli_query($koneksi, "SELECT * FROM users WHERE id_user != '{$_SESSION['id_user']}' ORDER BY role ASC");
+$idAktif = (int)$_SESSION['id_user'];
+$stmtUsers = mysqli_prepare($koneksi, 'SELECT id_user, nama_lengkap, username, role FROM users WHERE id_user != ? ORDER BY role ASC');
+mysqli_stmt_bind_param($stmtUsers, 'i', $idAktif);
+mysqli_stmt_execute($stmtUsers);
+$query_users = mysqli_stmt_get_result($stmtUsers);
 ?>
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="dark">
@@ -56,7 +71,7 @@ $query_users = mysqli_query($koneksi, "SELECT * FROM users WHERE id_user != '{$_
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 border-bottom border-secondary">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="#">WargaNet Panel</a>
-            <span class="navbar-text">Halo, <?= $_SESSION['nama_lengkap']; ?>!</span>
+            <span class="navbar-text">Halo, <?= e($_SESSION['nama_lengkap'] ?? 'Admin'); ?>!</span>
         </div>
     </nav>
 
@@ -96,8 +111,8 @@ $query_users = mysqli_query($koneksi, "SELECT * FROM users WHERE id_user != '{$_
                                 <?php $no = 1; while ($row = mysqli_fetch_assoc($query_users)) : ?>
                                 <tr>
                                     <td class="align-middle"><?= $no++; ?></td>
-                                    <td class="align-middle"><?= $row['nama_lengkap']; ?></td>
-                                    <td class="align-middle">@<?= $row['username']; ?></td>
+                                    <td class="align-middle"><?= e($row['nama_lengkap']); ?></td>
+                                    <td class="align-middle">@<?= e($row['username']); ?></td>
                                     <td class="align-middle">
                                         <?php if($row['role'] == 'admin') { echo '<span class="badge bg-danger">Admin</span>'; } 
                                         else if($row['role'] == 'penulis') { echo '<span class="badge bg-primary">Penulis</span>'; } 
@@ -105,7 +120,7 @@ $query_users = mysqli_query($koneksi, "SELECT * FROM users WHERE id_user != '{$_
                                     </td>
                                     <td>
                                         <!-- Form Kecil untuk Ubah Role Langsung di Tabel -->
-                                        <form action="" method="POST" class="d-flex gap-2">
+                                        <form action="" method="POST" class="d-flex gap-2"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()); ?>">
                                             <input type="hidden" name="id_user" value="<?= $row['id_user']; ?>">
                                             <select name="role_baru" class="form-select form-select-sm bg-dark text-white border-secondary">
                                                 <option value="pembaca" <?= ($row['role'] == 'pembaca') ? 'selected' : ''; ?>>Pembaca</option>
@@ -113,7 +128,7 @@ $query_users = mysqli_query($koneksi, "SELECT * FROM users WHERE id_user != '{$_
                                                 <option value="admin" <?= ($row['role'] == 'admin') ? 'selected' : ''; ?>>Admin</option>
                                             </select>
                                             <button type="submit" name="ubah_role" class="btn btn-sm btn-success">Simpan</button>
-                                            <a href="pengguna.php?hapus=<?= $row['id_user']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Hapus akun ini permanen?');">Hapus</a>
+                                            <button type="submit" name="hapus_user" class="btn btn-sm btn-outline-danger" onclick="return confirm('Hapus akun ini permanen?');">Hapus</button>
                                         </form>
                                     </td>
                                 </tr>

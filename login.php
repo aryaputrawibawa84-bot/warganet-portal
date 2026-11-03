@@ -1,6 +1,12 @@
 <?php
+$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+session_set_cookie_params([
+    'lifetime' => 0, 'path' => '/', 'secure' => $https,
+    'httponly' => true, 'samesite' => 'Lax'
+]);
 session_start();
-require 'koneksi.php';
+require_once __DIR__ . '/includes/security.php';
+require_once __DIR__ . '/koneksi.php';
 
 // Jika sudah login, arahkan sesuai role
 if (isset($_SESSION['id_user'])) {
@@ -17,27 +23,40 @@ if (isset($_SESSION['id_user'])) {
 $error = false;
 
 if (isset($_POST['login'])) {
-    $username = mysqli_real_escape_string($koneksi, $_POST['username']);
-    $password = $_POST['password'];
+    require_csrf();
+    $username = trim((string)($_POST['username'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
 
-    $result = mysqli_query($koneksi, "SELECT * FROM users WHERE username = '$username'");
-    
-    if (mysqli_num_rows($result) === 1) {
-        $row = mysqli_fetch_assoc($result);
-        
-        if (password_verify($password, $row['password'])) {
-            $_SESSION['id_user'] = $row['id_user'];
-            $_SESSION['nama_lengkap'] = $row['nama_lengkap'];
-            $_SESSION['role'] = $row['role'];
-            
-            if ($row['role'] == 'admin') {
-                header("Location: admin/index.php");
-            } elseif ($row['role'] == 'penulis') {
-                header("Location: penulis/index.php");
-            } else {
-                header("Location: index.php"); 
+    if ($username !== '' && $password !== '') {
+        $stmt = mysqli_prepare($koneksi, 'SELECT id_user, nama_lengkap, username, password, role FROM users WHERE username = ? LIMIT 1');
+        if ($stmt) {
+            mysqli_stmt_bind_param($stmt, 's', $username);
+            mysqli_stmt_execute($stmt);
+            $result = mysqli_stmt_get_result($stmt);
+            $row = $result ? mysqli_fetch_assoc($result) : null;
+            mysqli_stmt_close($stmt);
+
+            if ($row && password_verify($password, $row['password'])) {
+                session_regenerate_id(true);
+                $_SESSION['id_user'] = (int)$row['id_user'];
+                $_SESSION['nama_lengkap'] = $row['nama_lengkap'];
+                $_SESSION['role'] = $row['role'];
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+
+                if ($row['role'] === 'admin') {
+                    header('Location: admin/index.php');
+                } elseif ($row['role'] === 'penulis') {
+                    header('Location: penulis/index.php');
+                } else {
+                    // Pembaca: kembali ke artikel yang tadi dibuka (diset oleh detail.php)
+                    $tujuan = $_SESSION['after_login'] ?? 'index.php';
+                    unset($_SESSION['after_login']);
+                    header('Location: ' . $tujuan);
+                }
+                exit;
             }
-            exit;
+        } else {
+            error_log('WargaNet could not prepare login query.');
         }
     }
     $error = true;
@@ -47,6 +66,7 @@ if (isset($_POST['login'])) {
 <html lang="id" data-bs-theme="dark">
     
 <head>
+    <meta charset="UTF-8">
     <meta name="theme-color" content="#0B1120">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Masuk - WargaNet</title>
@@ -55,7 +75,7 @@ if (isset($_POST['login'])) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/warganet.css">
+    <link rel="stylesheet" href="assets/css/warganet.css?v=<?= (int) @filemtime(__DIR__ . '/assets/css/warganet.css'); ?>">
     <script>document.documentElement.classList.add('js')</script>
 </head>
 <body class="wn-auth">
@@ -107,11 +127,12 @@ if (isset($_POST['login'])) {
                 <?php endif; ?>
 
                 <form action="" method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()); ?>">
                     <div class="mb-3">
                         <label class="form-label text-secondary text-small mb-1">Username</label>
                         <div class="input-group">
                             <span class="input-group-text rounded-start-2"><i class="bi bi-person"></i></span>
-                            <input type="text" class="form-control rounded-end-2" name="username" placeholder="Masukkan username Anda" required autocomplete="off">
+                            <input type="text" class="form-control rounded-end-2" name="username" placeholder="Masukkan username Anda" required autocomplete="username" maxlength="50">
                         </div>
                     </div>
 
@@ -119,7 +140,7 @@ if (isset($_POST['login'])) {
                         <label class="form-label text-secondary text-small mb-1">Kata sandi</label>
                         <div class="input-group">
                             <span class="input-group-text rounded-start-2"><i class="bi bi-lock"></i></span>
-                            <input type="password" class="form-control rounded-end-2" name="password" placeholder="••••••••••••" required>
+                            <input type="password" class="form-control rounded-end-2" name="password" placeholder="••••••••••••" required autocomplete="current-password">
                         </div>
                     </div>
 
@@ -150,6 +171,6 @@ if (isset($_POST['login'])) {
 
     </div>
 
-    <script src="assets/js/warganet.js"></script>
+    <script src="assets/js/warganet.js?v=<?= (int) @filemtime(__DIR__ . '/assets/js/warganet.js'); ?>"></script>
 </body>
 </html>

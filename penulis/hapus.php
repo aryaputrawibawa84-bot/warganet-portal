@@ -1,35 +1,28 @@
 <?php
+$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+session_set_cookie_params(['lifetime'=>0,'path'=>'/','secure'=>$https,'httponly'=>true,'samesite'=>'Lax']);
 session_start();
+require_once '../includes/security.php';
 require '../koneksi.php';
-
 if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'penulis') {
-    header("Location: ../login.php");
-    exit;
+    header('Location: ../login.php'); exit;
 }
-
-if (isset($_GET['id'])) {
-    $id_artikel = mysqli_real_escape_string($koneksi, $_GET['id']);
-    $id_user_aktif = $_SESSION['id_user'];
-
-    // Pastikan hanya mencari gambar dari artikel milik penulis ini
-    $query_gambar = mysqli_query($koneksi, "SELECT gambar FROM artikel WHERE id_artikel = '$id_artikel' AND id_user = '$id_user_aktif'");
-    
-    if (mysqli_num_rows($query_gambar) > 0) {
-        $data_gambar = mysqli_fetch_assoc($query_gambar);
-        
-        // Hapus file fisik gambar jika ada
-        if (file_exists('../uploads/' . $data_gambar['gambar'])) {
-            unlink('../uploads/' . $data_gambar['gambar']);
-        }
-
-        // Hapus data dari database
-        mysqli_query($koneksi, "DELETE FROM artikel WHERE id_artikel = '$id_artikel' AND id_user = '$id_user_aktif'");
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: index.php'); exit; }
+require_csrf();
+$id = valid_positive_int($_POST['id_artikel'] ?? null);
+if ($id === null) { header('Location: index.php'); exit; }
+$userId = (int)$_SESSION['id_user'];
+$stmt = mysqli_prepare($koneksi, 'SELECT gambar FROM artikel WHERE id_artikel = ? AND id_user = ? LIMIT 1');
+mysqli_stmt_bind_param($stmt, 'ii', $id, $userId); mysqli_stmt_execute($stmt);
+$res = mysqli_stmt_get_result($stmt); $row = $res ? mysqli_fetch_assoc($res) : null; mysqli_stmt_close($stmt);
+if ($row) {
+    $del = mysqli_prepare($koneksi, 'DELETE FROM artikel WHERE id_artikel = ? AND id_user = ?');
+    mysqli_stmt_bind_param($del, 'ii', $id, $userId); $ok = mysqli_stmt_execute($del); mysqli_stmt_close($del);
+    if ($ok && !empty($row['gambar'])) {
+        $name = basename((string)$row['gambar']);
+        $path = realpath(__DIR__ . '/../uploads');
+        $file = $path ? realpath($path . DIRECTORY_SEPARATOR . $name) : false;
+        if ($path && $file && strpos($file, $path . DIRECTORY_SEPARATOR) === 0 && is_file($file)) { @unlink($file); }
     }
-    
-    header("Location: index.php");
-    exit;
-} else {
-    header("Location: index.php");
-    exit;
 }
-?>
+header('Location: index.php'); exit;

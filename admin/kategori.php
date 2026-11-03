@@ -1,5 +1,11 @@
 <?php
+$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+session_set_cookie_params([
+    'lifetime' => 0, 'path' => '/', 'secure' => $https,
+    'httponly' => true, 'samesite' => 'Lax'
+]);
 session_start();
+require_once '../includes/security.php';
 require '../koneksi.php';
 
 // Proteksi halaman admin
@@ -10,26 +16,27 @@ if (!isset($_SESSION['id_user']) || $_SESSION['role'] !== 'admin') {
 
 $pesan = "";
 
-// Logika Tambah Kategori
-if (isset($_POST['tambah'])) {
-    $nama_kategori = mysqli_real_escape_string($koneksi, $_POST['nama_kategori']);
-    $insert = mysqli_query($koneksi, "INSERT INTO kategori (nama_kategori) VALUES ('$nama_kategori')");
-    
-    if ($insert) {
-        $pesan = "<div class='alert alert-success py-2'>Kategori berhasil ditambahkan!</div>";
-    } else {
-        $pesan = "<div class='alert alert-danger py-2'>Gagal menambahkan kategori.</div>";
+// Semua perubahan data wajib menggunakan POST dan token CSRF.
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
+    if (isset($_POST['tambah'])) {
+        $nama_kategori = trim((string)($_POST['nama_kategori'] ?? ''));
+        if ($nama_kategori === '' || mb_strlen($nama_kategori) > 100) {
+            $pesan = "<div class='alert alert-danger py-2'>Nama kategori wajib diisi (maksimal 100 karakter).</div>";
+        } else {
+            $stmt = mysqli_prepare($koneksi, 'INSERT INTO kategori (nama_kategori) VALUES (?)');
+            mysqli_stmt_bind_param($stmt, 's', $nama_kategori);
+            $ok = mysqli_stmt_execute($stmt); mysqli_stmt_close($stmt);
+            $pesan = $ok ? "<div class='alert alert-success py-2'>Kategori berhasil ditambahkan!</div>" : "<div class='alert alert-danger py-2'>Gagal menambahkan kategori.</div>";
+        }
+    } elseif (isset($_POST['hapus_kategori'])) {
+        $id_hapus = valid_positive_int($_POST['id_kategori'] ?? null);
+        if ($id_hapus !== null) {
+            $stmt = mysqli_prepare($koneksi, 'DELETE FROM kategori WHERE id_kategori = ?');
+            mysqli_stmt_bind_param($stmt, 'i', $id_hapus); mysqli_stmt_execute($stmt); mysqli_stmt_close($stmt);
+        }
+        header('Location: kategori.php'); exit;
     }
-}
-
-// Logika Hapus Kategori
-if (isset($_GET['hapus'])) {
-    $id_hapus = mysqli_real_escape_string($koneksi, $_GET['hapus']);
-    // Catatan: Karena di database kita setting ON DELETE SET NULL, 
-    // menghapus kategori tidak akan menghapus artikelnya (kategori artikel akan menjadi kosong/null).
-    mysqli_query($koneksi, "DELETE FROM kategori WHERE id_kategori = '$id_hapus'");
-    header("Location: kategori.php");
-    exit;
 }
 
 // Ambil data kategori
@@ -54,7 +61,7 @@ $query_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY id_kat
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 border-bottom border-secondary">
         <div class="container-fluid">
             <a class="navbar-brand fw-bold" href="#">WargaNet Panel</a>
-            <span class="navbar-text">Halo, <?= $_SESSION['nama_lengkap']; ?>!</span>
+            <span class="navbar-text">Halo, <?= e($_SESSION['nama_lengkap'] ?? 'Admin'); ?>!</span>
         </div>
     </nav>
 
@@ -82,6 +89,7 @@ $query_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY id_kat
                             <div class="card-body">
                                 <h5 class="card-title border-bottom border-secondary pb-2 mb-3">Tambah Kategori</h5>
                                 <form action="" method="POST">
+                                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()); ?>">
                                     <div class="mb-3">
                                         <label class="form-label text-secondary">Nama Kategori</label>
                                         <input type="text" name="nama_kategori" class="form-control bg-dark text-white border-secondary" required placeholder="Contoh: Olahraga">
@@ -108,9 +116,9 @@ $query_kategori = mysqli_query($koneksi, "SELECT * FROM kategori ORDER BY id_kat
                                         <?php $no = 1; while ($row = mysqli_fetch_assoc($query_kategori)) : ?>
                                         <tr>
                                             <td><?= $no++; ?></td>
-                                            <td><?= $row['nama_kategori']; ?></td>
+                                            <td><?= e($row['nama_kategori']); ?></td>
                                             <td>
-                                                <a href="kategori.php?hapus=<?= $row['id_kategori']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Hapus kategori ini?');">Hapus</a>
+                                                <form action="kategori.php" method="POST" class="d-inline" onsubmit="return confirm('Hapus kategori ini?');"><input type="hidden" name="csrf_token" value="<?= e(csrf_token()); ?>"><input type="hidden" name="id_kategori" value="<?= (int)$row['id_kategori']; ?>"><button type="submit" name="hapus_kategori" class="btn btn-sm btn-danger">Hapus</button></form>
                                             </td>
                                         </tr>
                                         <?php endwhile; ?>
