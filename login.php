@@ -1,67 +1,161 @@
+
 <?php
+// 1. Pengaturan session cookie
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+
 session_set_cookie_params([
-    'lifetime' => 0, 'path' => '/', 'secure' => $https,
-    'httponly' => true, 'samesite' => 'Lax'
+    'lifetime' => 0,
+    'path' => '/',
+    'secure' => $https,
+    'httponly' => true,
+    'samesite' => 'Lax'
 ]);
+
 session_start();
+
 require_once __DIR__ . '/includes/security.php';
 require_once __DIR__ . '/koneksi.php';
 
-// Jika sudah login, arahkan sesuai role
+// 2. Jika sudah login, arahkan berdasarkan role
 if (isset($_SESSION['id_user'])) {
-    if ($_SESSION['role'] == 'admin') {
-        header("Location: admin/index.php");
-    } elseif ($_SESSION['role'] == 'penulis') {
-        header("Location: penulis/index.php");
-    } else {
-        header("Location: index.php");
+
+    $role = $_SESSION['role'] ?? '';
+
+    if ($role === 'admin') {
+        header('Location: admin/index.php');
+        exit;
     }
-    exit;
+
+    if ($role === 'penulis') {
+        header('Location: penulis/index.php');
+        exit;
+    }
+
+    if ($role === 'pembaca') {
+        header('Location: index.php');
+        exit;
+    }
+
+    // Hapus session jika role tidak dikenal
+    $_SESSION = [];
+    session_regenerate_id(true);
 }
 
+// 3. Status pesan kesalahan
 $error = false;
 
-if (isset($_POST['login'])) {
-    require_csrf();
-    $username = trim((string)($_POST['username'] ?? ''));
-    $password = (string)($_POST['password'] ?? '');
+// 4. Proses login
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
-    if ($username !== '' && $password !== '') {
-        $stmt = mysqli_prepare($koneksi, 'SELECT id_user, nama_lengkap, username, password, role FROM users WHERE username = ? LIMIT 1');
+    require_csrf();
+
+    $username = trim((string) ($_POST['username'] ?? ''));
+    $password = (string) ($_POST['password'] ?? '');
+
+    if (
+        $username !== '' &&
+        mb_strlen($username) <= 50 &&
+        $password !== ''
+    ) {
+
+        // 5. Cari pengguna berdasarkan username
+        $stmt = mysqli_prepare(
+            $koneksi,
+            'SELECT id_user, nama_lengkap, username, password, role
+             FROM users
+             WHERE username = ?
+             LIMIT 1'
+        );
+
         if ($stmt) {
+
             mysqli_stmt_bind_param($stmt, 's', $username);
-            mysqli_stmt_execute($stmt);
-            $result = mysqli_stmt_get_result($stmt);
-            $row = $result ? mysqli_fetch_assoc($result) : null;
+
+            if (mysqli_stmt_execute($stmt)) {
+
+                $result = mysqli_stmt_get_result($stmt);
+                $row = $result ? mysqli_fetch_assoc($result) : null;
+
+                // 6. Verifikasi password dan role
+                $roleValid = $row &&
+                    in_array($row['role'], ['admin', 'penulis', 'pembaca'], true);
+
+                if (
+                    $roleValid &&
+                    password_verify($password, $row['password'])
+                ) {
+
+                    // Validasi tujuan redirect pembaca
+                    $tujuan = 'index.php';
+
+                    if ($row['role'] === 'pembaca') {
+
+                        $afterLogin = $_SESSION['after_login'] ?? 'index.php';
+
+                        // Hanya izinkan index.php atau detail.php?id=angka
+                        if (is_string($afterLogin)) {
+
+                            if ($afterLogin === 'index.php') {
+                                $tujuan = 'index.php';
+
+                            } elseif (
+                                preg_match(
+                                    '/\Adetail\.php\?id=([1-9][0-9]*)\z/',
+                                    $afterLogin,
+                                    $matches
+                                )
+                            ) {
+                                $tujuan = 'detail.php?id=' . $matches[1];
+                            }
+                        }
+                    }
+
+                    mysqli_stmt_close($stmt);
+
+                    // 7. Perbarui session ID setelah login
+                    session_regenerate_id(true);
+
+                    // Bersihkan data session lama
+                    $_SESSION = [];
+
+                    // Simpan informasi pengguna
+                    $_SESSION['id_user'] = (int) $row['id_user'];
+                    $_SESSION['nama_lengkap'] = $row['nama_lengkap'];
+                    $_SESSION['role'] = $row['role'];
+
+                    // Buat token CSRF baru
+                    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+
+                    // 8. Redirect berdasarkan role
+                    if ($row['role'] === 'admin') {
+                        header('Location: admin/index.php');
+
+                    } elseif ($row['role'] === 'penulis') {
+                        header('Location: penulis/index.php');
+
+                    } else {
+                        header('Location: ' . $tujuan);
+                    }
+
+                    exit;
+                }
+
+            } else {
+                error_log('WargaNet login execution failed: ' . mysqli_stmt_error($stmt));
+            }
+
             mysqli_stmt_close($stmt);
 
-            if ($row && password_verify($password, $row['password'])) {
-                session_regenerate_id(true);
-                $_SESSION['id_user'] = (int)$row['id_user'];
-                $_SESSION['nama_lengkap'] = $row['nama_lengkap'];
-                $_SESSION['role'] = $row['role'];
-                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-
-                if ($row['role'] === 'admin') {
-                    header('Location: admin/index.php');
-                } elseif ($row['role'] === 'penulis') {
-                    header('Location: penulis/index.php');
-                } else {
-                    // Pembaca: kembali ke artikel yang tadi dibuka (diset oleh detail.php)
-                    $tujuan = $_SESSION['after_login'] ?? 'index.php';
-                    unset($_SESSION['after_login']);
-                    header('Location: ' . $tujuan);
-                }
-                exit;
-            }
         } else {
-            error_log('WargaNet could not prepare login query.');
+            error_log('WargaNet login prepare failed: ' . mysqli_error($koneksi));
         }
     }
+
+    // Pesan umum agar tidak membocorkan informasi akun
     $error = true;
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="dark">
     

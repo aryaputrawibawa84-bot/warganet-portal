@@ -1,15 +1,28 @@
+
 <?php
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+
 session_set_cookie_params([
-    'lifetime' => 0, 'path' => '/', 'secure' => $https,
-    'httponly' => true, 'samesite' => 'Lax'
+    'lifetime' => 0,
+    'path' => '/',
+    'secure' => $https,
+    'httponly' => true,
+    'samesite' => 'Lax'
 ]);
+
 session_start();
+
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../koneksi.php';
 
-// Proteksi: hanya akun berperan 'penulis' yang boleh membuka halaman ini
-if (!isset($_SESSION['id_user'], $_SESSION['role']) || $_SESSION['role'] !== 'penulis') {
+// 1. Proteksi halaman: hanya penulis yang boleh masuk
+$id_user = valid_positive_int($_SESSION['id_user'] ?? null);
+
+if (
+    !isset($_SESSION['role']) ||
+    $_SESSION['role'] !== 'penulis' ||
+    $id_user === null
+) {
     header('Location: ../login.php');
     exit;
 }
@@ -19,65 +32,135 @@ $judul_lama = '';
 $isi_lama = '';
 $kategori_lama = null;
 
-$query_kategori = mysqli_query($koneksi, 'SELECT id_kategori, nama_kategori FROM kategori ORDER BY nama_kategori');
+// 2. Ambil daftar kategori
+$query_kategori = mysqli_query(
+    $koneksi,
+    'SELECT id_kategori, nama_kategori
+     FROM kategori
+     ORDER BY nama_kategori'
+);
+
 if (!$query_kategori) {
     error_log('WargaNet category query failed: ' . mysqli_error($koneksi));
     $pesan_error = 'Kategori belum dapat dimuat. Silakan coba kembali.';
 }
 
+// 3. Proses penyimpanan artikel
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
+
+    // Validasi token CSRF
     require_csrf();
+
     $judul = trim((string)($_POST['judul'] ?? ''));
     $isi_artikel = trim((string)($_POST['isi_artikel'] ?? ''));
     $id_kategori = valid_positive_int($_POST['id_kategori'] ?? null);
-    $id_user = (int)$_SESSION['id_user'];
 
-    // Simpan isian supaya tidak hilang kalau ada error
+    // Simpan input agar tidak hilang ketika terjadi kesalahan
     $judul_lama = $judul;
     $isi_lama = $isi_artikel;
     $kategori_lama = $id_kategori;
 
-    if ($judul === '' || mb_strlen($judul) > 200 || $isi_artikel === '') {
+    // Validasi input
+    if (
+        $judul === '' ||
+        mb_strlen($judul) > 200 ||
+        $isi_artikel === ''
+    ) {
         $pesan_error = 'Judul wajib diisi (maksimal 200 karakter) dan isi artikel tidak boleh kosong.';
     } elseif ($id_kategori === null) {
         $pesan_error = 'Pilih kategori yang valid.';
     } else {
-        $check = mysqli_prepare($koneksi, 'SELECT id_kategori FROM kategori WHERE id_kategori = ?');
-        mysqli_stmt_bind_param($check, 'i', $id_kategori);
-        mysqli_stmt_execute($check);
-        $categoryExists = mysqli_stmt_get_result($check);
-        $validCategory = $categoryExists && mysqli_num_rows($categoryExists) === 1;
-        mysqli_stmt_close($check);
 
-        if (!$validCategory) {
-            $pesan_error = 'Kategori yang dipilih tidak ditemukan.';
+        // 4. Pastikan kategori benar-benar tersedia
+        $check = mysqli_prepare(
+            $koneksi,
+            'SELECT id_kategori FROM kategori WHERE id_kategori = ?'
+        );
+
+        if (!$check) {
+            error_log('WargaNet category prepare failed: ' . mysqli_error($koneksi));
+            $pesan_error = 'Terjadi kesalahan saat memeriksa kategori.';
         } else {
-            $upload = save_uploaded_image($_FILES['gambar'] ?? [], __DIR__ . '/../uploads');
-            if ($upload['error'] !== null) {
-                $pesan_error = $upload['error'];
+            mysqli_stmt_bind_param($check, 'i', $id_kategori);
+            mysqli_stmt_execute($check);
+            mysqli_stmt_store_result($check);
+
+            $validCategory = mysqli_stmt_num_rows($check) === 1;
+
+            mysqli_stmt_close($check);
+
+            if (!$validCategory) {
+                $pesan_error = 'Kategori yang dipilih tidak ditemukan.';
             } else {
-                $gambar = $upload['filename'];
-                $status = 'pending'; // artikel penulis menunggu persetujuan admin
-                $stmt = mysqli_prepare($koneksi, 'INSERT INTO artikel (judul, isi_artikel, gambar, id_kategori, id_user, status) VALUES (?, ?, ?, ?, ?, ?)');
-                if ($stmt) {
-                    mysqli_stmt_bind_param($stmt, 'sssiis', $judul, $isi_artikel, $gambar, $id_kategori, $id_user, $status);
-                    if (mysqli_stmt_execute($stmt)) {
-                        mysqli_stmt_close($stmt);
-                        header('Location: index.php');
-                        exit;
-                    }
-                    error_log('WargaNet penulis article insert failed: ' . mysqli_stmt_error($stmt));
-                    mysqli_stmt_close($stmt);
+
+                // 5. Validasi dan simpan gambar
+                $upload = save_uploaded_image(
+                    $_FILES['gambar'] ?? [],
+                    __DIR__ . '/../uploads'
+                );
+
+                if ($upload['error'] !== null) {
+                    $pesan_error = $upload['error'];
                 } else {
-                    error_log('WargaNet penulis article prepare failed: ' . mysqli_error($koneksi));
+                    $gambar = $upload['filename'];
+
+                    // Penulis tidak boleh menerbitkan artikel sendiri
+                    $status = 'pending';
+
+                    // 6. Simpan artikel menggunakan prepared statement
+                    $stmt = mysqli_prepare(
+                        $koneksi,
+                        'INSERT INTO artikel
+                        (judul, isi_artikel, gambar, id_kategori, id_user, status)
+                        VALUES (?, ?, ?, ?, ?, ?)'
+                    );
+
+                    if ($stmt) {
+                        mysqli_stmt_bind_param(
+                            $stmt,
+                            'sssiis',
+                            $judul,
+                            $isi_artikel,
+                            $gambar,
+                            $id_kategori,
+                            $id_user,
+                            $status
+                        );
+
+                        if (mysqli_stmt_execute($stmt)) {
+                            mysqli_stmt_close($stmt);
+
+                            // Berhasil: kembali ke halaman artikel penulis
+                            header('Location: index.php');
+                            exit;
+                        }
+
+                        error_log(
+                            'WargaNet penulis insert failed: ' .
+                            mysqli_stmt_error($stmt)
+                        );
+
+                        mysqli_stmt_close($stmt);
+                    } else {
+                        error_log(
+                            'WargaNet penulis prepare failed: ' .
+                            mysqli_error($koneksi)
+                        );
+                    }
+
+                    // 7. Hapus gambar jika penyimpanan artikel gagal
+                    if (!empty($gambar)) {
+                        @unlink(__DIR__ . '/../uploads/' . basename($gambar));
+                    }
+
+                    $pesan_error = 'Artikel gagal disimpan. Silakan periksa data dan coba kembali.';
                 }
-                @unlink(__DIR__ . '/../uploads/' . $gambar);
-                $pesan_error = 'Artikel gagal disimpan. Silakan periksa data dan coba kembali.';
             }
         }
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="dark">
 <head>

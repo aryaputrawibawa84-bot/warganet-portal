@@ -1,75 +1,166 @@
+
 <?php
+// 1. Pengaturan session cookie
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+
 session_set_cookie_params([
-    'lifetime' => 0, 'path' => '/', 'secure' => $https,
-    'httponly' => true, 'samesite' => 'Lax'
+    'lifetime' => 0,
+    'path' => '/',
+    'secure' => $https,
+    'httponly' => true,
+    'samesite' => 'Lax'
 ]);
+
 session_start();
+
 require_once __DIR__ . '/includes/security.php';
 require_once __DIR__ . '/koneksi.php';
 
-// Jika sudah login, tidak boleh buka halaman register
+// 2. Jika sudah login, arahkan sesuai role
 if (isset($_SESSION['id_user'])) {
-    header("Location: index.php");
+    $role = $_SESSION['role'] ?? '';
+
+    if ($role === 'admin') {
+        header('Location: admin/index.php');
+    } elseif ($role === 'penulis') {
+        header('Location: penulis/index.php');
+    } else {
+        header('Location: index.php');
+    }
+
     exit;
 }
 
-$pesan_error = "";
-$pesan_sukses = "";
+$pesan_error = '';
+$pesan_sukses = '';
 
-if (isset($_POST['register'])) {
+// 3. Proses pendaftaran hanya melalui POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register'])) {
+
     require_csrf();
-    $nama_lengkap = trim((string)($_POST['nama_lengkap'] ?? ''));
-    $username = trim((string)($_POST['username'] ?? ''));
-    $password = (string)($_POST['password'] ?? '');
-    $konfirmasi_password = (string)($_POST['konfirmasi_password'] ?? '');
 
-    if ($nama_lengkap === '' || mb_strlen($nama_lengkap) > 100) {
+    $nama_lengkap = trim((string) ($_POST['nama_lengkap'] ?? ''));
+    $username = trim((string) ($_POST['username'] ?? ''));
+    $password = (string) ($_POST['password'] ?? '');
+    $konfirmasi_password = (string) ($_POST['konfirmasi_password'] ?? '');
+
+    // 4. Validasi data
+    if (
+        $nama_lengkap === '' ||
+        mb_strlen($nama_lengkap) > 100
+    ) {
         $pesan_error = 'Nama lengkap wajib diisi dan maksimal 100 karakter.';
-    } elseif (!preg_match('/^[A-Za-z0-9_.-]{3,50}$/', $username)) {
+
+    } elseif (
+        !preg_match('/\A[A-Za-z0-9_.-]{3,50}\z/', $username)
+    ) {
         $pesan_error = 'Username harus 3–50 karakter dan hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.';
-    } elseif (strlen($password) < 8 || strlen($password) > 4096) {
-        $pesan_error = 'Kata sandi harus minimal 8 karakter.';
+
+    } elseif (
+        strlen($password) < 8 ||
+        strlen($password) > 72
+    ) {
+        $pesan_error = 'Kata sandi harus minimal 8 karakter dan maksimal 72 byte.';
+
     } elseif ($password !== $konfirmasi_password) {
         $pesan_error = 'Konfirmasi kata sandi tidak cocok!';
+
     } else {
-        $stmt = mysqli_prepare($koneksi, 'SELECT id_user FROM users WHERE username = ? LIMIT 1');
+
+        // 5. Periksa apakah username sudah digunakan
+        $stmt = mysqli_prepare(
+            $koneksi,
+            'SELECT id_user
+             FROM users
+             WHERE username = ?
+             LIMIT 1'
+        );
+
         if (!$stmt) {
-            error_log('WargaNet could not prepare username lookup.');
+            error_log('WargaNet registration lookup prepare failed: ' . mysqli_error($koneksi));
             $pesan_error = 'Pendaftaran belum dapat diproses. Silakan coba kembali.';
+
         } else {
+
             mysqli_stmt_bind_param($stmt, 's', $username);
-            mysqli_stmt_execute($stmt);
-            $result = mysqli_stmt_get_result($stmt);
+
+            $lookup_ok = mysqli_stmt_execute($stmt);
+            $result = $lookup_ok ? mysqli_stmt_get_result($stmt) : false;
+
             $exists = $result && mysqli_num_rows($result) > 0;
+
+            if (!$lookup_ok) {
+                error_log('WargaNet registration lookup failed: ' . mysqli_stmt_error($stmt));
+            }
+
             mysqli_stmt_close($stmt);
 
-            if ($exists) {
+            if (!$lookup_ok) {
+                $pesan_error = 'Pendaftaran belum dapat diproses. Silakan coba kembali.';
+
+            } elseif ($exists) {
                 $pesan_error = 'Username sudah terdaftar, silakan gunakan yang lain!';
+
             } else {
+
+                // 6. Hash password sebelum disimpan
                 $password_hashed = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = mysqli_prepare($koneksi, 'INSERT INTO users (nama_lengkap, username, password) VALUES (?, ?, ?)');
-                if ($stmt) {
-                    mysqli_stmt_bind_param($stmt, 'sss', $nama_lengkap, $username, $password_hashed);
-                    if (mysqli_stmt_execute($stmt)) {
-                        $pesan_sukses = 'Pendaftaran berhasil! Silakan masuk dengan akun baru Anda.';
-                    } else {
-                        // 1062 = duplicate key; tangani aman jika dua pendaftaran bersamaan.
-                        $pesan_error = mysqli_stmt_errno($stmt) === 1062
-                            ? 'Username sudah terdaftar, silakan gunakan yang lain!'
-                            : 'Pendaftaran gagal diproses. Silakan coba kembali.';
-                        error_log('WargaNet registration insert failed, errno=' . mysqli_stmt_errno($stmt));
-                    }
-                    mysqli_stmt_close($stmt);
-                } else {
-                    error_log('WargaNet could not prepare registration insert.');
+
+                if ($password_hashed === false) {
+                    error_log('WargaNet password hashing failed.');
                     $pesan_error = 'Pendaftaran belum dapat diproses. Silakan coba kembali.';
+
+                } else {
+
+                    // 7. Role pendaftar selalu pembaca
+                    $role = 'pembaca';
+
+                    $stmt = mysqli_prepare(
+                        $koneksi,
+                        'INSERT INTO users
+                         (nama_lengkap, username, password, role)
+                         VALUES (?, ?, ?, ?)'
+                    );
+
+                    if (!$stmt) {
+                        error_log('WargaNet registration insert prepare failed: ' . mysqli_error($koneksi));
+                        $pesan_error = 'Pendaftaran belum dapat diproses. Silakan coba kembali.';
+
+                    } else {
+
+                        mysqli_stmt_bind_param(
+                            $stmt,
+                            'ssss',
+                            $nama_lengkap,
+                            $username,
+                            $password_hashed,
+                            $role
+                        );
+
+                        if (mysqli_stmt_execute($stmt)) {
+                            $pesan_sukses = 'Pendaftaran berhasil! Silakan masuk dengan akun baru Anda.';
+
+                        } else {
+
+                            $errno = mysqli_stmt_errno($stmt);
+
+                            if ($errno === 1062) {
+                                $pesan_error = 'Username sudah terdaftar, silakan gunakan yang lain!';
+                            } else {
+                                $pesan_error = 'Pendaftaran gagal diproses. Silakan coba kembali.';
+                                error_log('WargaNet registration insert failed, errno=' . $errno);
+                            }
+                        }
+
+                        mysqli_stmt_close($stmt);
+                    }
                 }
             }
         }
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="id" data-bs-theme="dark">
 <head>

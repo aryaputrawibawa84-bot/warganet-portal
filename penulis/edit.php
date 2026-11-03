@@ -1,38 +1,35 @@
+
 <?php
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+
 session_set_cookie_params([
-    'lifetime' => 0, 'path' => '/', 'secure' => $https,
-    'httponly' => true, 'samesite' => 'Lax'
+    'lifetime' => 0,
+    'path' => '/',
+    'secure' => $https,
+    'httponly' => true,
+    'samesite' => 'Lax'
 ]);
+
 session_start();
+
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../koneksi.php';
 
-// Proteksi akses khusus penulis
-if (!isset($_SESSION['id_user'], $_SESSION['role']) || $_SESSION['role'] !== 'penulis') {
+// 1. Pastikan hanya penulis yang dapat mengakses halaman
+$id_user_aktif = valid_positive_int($_SESSION['id_user'] ?? null);
+
+if (
+    $id_user_aktif === null ||
+    ($_SESSION['role'] ?? '') !== 'penulis'
+) {
     header('Location: ../login.php');
     exit;
 }
 
-$id_user_aktif = (int) $_SESSION['id_user'];
-
-// Validasi ID artikel dari URL
+// 2. Validasi ID artikel dari URL
 $id_artikel = valid_positive_int($_GET['id'] ?? null);
+
 if ($id_artikel === null) {
-    header('Location: index.php');
-    exit;
-}
-
-// Hanya ambil artikel kalau benar-benar milik penulis yang sedang login
-$stmt = mysqli_prepare($koneksi, 'SELECT * FROM artikel WHERE id_artikel = ? AND id_user = ? LIMIT 1');
-mysqli_stmt_bind_param($stmt, 'ii', $id_artikel, $id_user_aktif);
-mysqli_stmt_execute($stmt);
-$hasil = mysqli_stmt_get_result($stmt);
-$data = $hasil ? mysqli_fetch_assoc($hasil) : null;
-mysqli_stmt_close($stmt);
-
-if (!$data) {
-    // Artikel tidak ada, atau milik orang lain
     header('Location: index.php');
     exit;
 }
@@ -40,43 +37,99 @@ if (!$data) {
 $upload_dir = __DIR__ . '/../uploads';
 $pesan_error = '';
 
-// Daftar kategori (dipakai untuk dropdown sekaligus validasi)
+// 3. Ambil artikel dan pastikan artikel milik penulis aktif
+$stmt = mysqli_prepare(
+    $koneksi,
+    'SELECT * FROM artikel
+     WHERE id_artikel = ? AND id_user = ?
+     LIMIT 1'
+);
+
+if (!$stmt) {
+    error_log('WargaNet edit select prepare failed: ' . mysqli_error($koneksi));
+    header('Location: index.php');
+    exit;
+}
+
+mysqli_stmt_bind_param($stmt, 'ii', $id_artikel, $id_user_aktif);
+mysqli_stmt_execute($stmt);
+
+$hasil = mysqli_stmt_get_result($stmt);
+$data = $hasil ? mysqli_fetch_assoc($hasil) : null;
+
+mysqli_stmt_close($stmt);
+
+if (!$data) {
+    header('Location: index.php');
+    exit;
+}
+
+// 4. Ambil kategori
 $daftar_kategori = [];
-$query_kategori = mysqli_query($koneksi, 'SELECT id_kategori, nama_kategori FROM kategori ORDER BY nama_kategori');
+
+$query_kategori = mysqli_query(
+    $koneksi,
+    'SELECT id_kategori, nama_kategori
+     FROM kategori
+     ORDER BY nama_kategori'
+);
+
 if ($query_kategori) {
     while ($k = mysqli_fetch_assoc($query_kategori)) {
         $daftar_kategori[(int) $k['id_kategori']] = $k['nama_kategori'];
     }
+} else {
+    error_log('WargaNet edit category query failed: ' . mysqli_error($koneksi));
+    $pesan_error = 'Kategori belum dapat dimuat. Silakan coba kembali.';
 }
 
-// Nilai awal form = data di database
+// 5. Isi awal form dari database
 $form = [
     'judul'       => (string) $data['judul'],
     'isi_artikel' => (string) $data['isi_artikel'],
-    'id_kategori' => (int) $data['id_kategori'],
+    'id_kategori' => (int) $data['id_kategori']
 ];
 
+// 6. Proses update artikel
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
+
     require_csrf();
 
-    $form['judul']       = trim((string) ($_POST['judul'] ?? ''));
+    $form['judul'] = trim((string) ($_POST['judul'] ?? ''));
     $form['isi_artikel'] = trim((string) ($_POST['isi_artikel'] ?? ''));
-    $form['id_kategori'] = (int) (valid_positive_int($_POST['id_kategori'] ?? null) ?? 0);
 
-    // Saat diedit, status otomatis dikembalikan ke 'pending' agar direviu ulang oleh admin
-    $status = 'pending';
+    $form['id_kategori'] = valid_positive_int(
+        $_POST['id_kategori'] ?? null
+    ) ?? 0;
 
-    if ($form['judul'] === '' || mb_strlen($form['judul']) > 200 || $form['isi_artikel'] === '') {
+    if ($pesan_error !== '') {
+        // Jangan lanjutkan jika kategori gagal dimuat.
+    } elseif (
+        $form['judul'] === '' ||
+        mb_strlen($form['judul']) > 200 ||
+        $form['isi_artikel'] === ''
+    ) {
         $pesan_error = 'Judul wajib diisi (maksimal 200 karakter) dan isi tulisan tidak boleh kosong.';
     } elseif (!isset($daftar_kategori[$form['id_kategori']])) {
         $pesan_error = 'Pilih kategori yang valid.';
     } else {
-        $gambar_final = $data['gambar'];
+
+        // Status dikembalikan ke pending untuk diperiksa admin
+        $status = 'pending';
+
+        $gambar_final = (string) ($data['gambar'] ?? '');
         $gambar_baru = null;
 
-        // Hanya proses upload kalau penulis memilih file baru
-        if (($_FILES['gambar']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-            $upload = save_uploaded_image($_FILES['gambar'], $upload_dir);
+        // 7. Upload gambar hanya jika pengguna memilih gambar baru
+        $error_upload = $_FILES['gambar']['error'] ?? UPLOAD_ERR_NO_FILE;
+
+        if ($error_upload !== UPLOAD_ERR_NO_FILE) {
+
+            $upload = save_uploaded_image(
+                $_FILES['gambar'] ?? [],
+                $upload_dir
+            );
+
             if ($upload['error'] !== null) {
                 $pesan_error = $upload['error'];
             } else {
@@ -86,33 +139,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
         }
 
         if ($pesan_error === '') {
-            // Kepemilikan dicek lagi di UPDATE (AND id_user = ?) sebagai lapis pengaman kedua
-            $upd = mysqli_prepare($koneksi, 'UPDATE artikel SET judul = ?, isi_artikel = ?, gambar = ?, id_kategori = ?, status = ? WHERE id_artikel = ? AND id_user = ?');
+
+            // 8. Update dengan pengecekan kepemilikan artikel
+            $upd = mysqli_prepare(
+                $koneksi,
+                'UPDATE artikel
+                 SET judul = ?,
+                     isi_artikel = ?,
+                     gambar = ?,
+                     id_kategori = ?,
+                     status = ?
+                 WHERE id_artikel = ? AND id_user = ?'
+            );
+
             $berhasil = false;
+
             if ($upd) {
-                mysqli_stmt_bind_param($upd, 'sssisii', $form['judul'], $form['isi_artikel'], $gambar_final, $form['id_kategori'], $status, $id_artikel, $id_user_aktif);
+                mysqli_stmt_bind_param(
+                    $upd,
+                    'sssisii',
+                    $form['judul'],
+                    $form['isi_artikel'],
+                    $gambar_final,
+                    $form['id_kategori'],
+                    $status,
+                    $id_artikel,
+                    $id_user_aktif
+                );
+
                 $berhasil = mysqli_stmt_execute($upd);
+
                 if (!$berhasil) {
-                    error_log('WargaNet penulis article update failed: ' . mysqli_stmt_error($upd));
+                    error_log(
+                        'WargaNet edit update failed: ' .
+                        mysqli_stmt_error($upd)
+                    );
                 }
+
                 mysqli_stmt_close($upd);
+
             } else {
-                error_log('WargaNet penulis article update prepare failed: ' . mysqli_error($koneksi));
+                error_log(
+                    'WargaNet edit prepare failed: ' .
+                    mysqli_error($koneksi)
+                );
             }
 
             if ($berhasil) {
-                // Gambar lama baru dihapus setelah update benar-benar berhasil
+
+                // Hapus gambar lama setelah update berhasil
                 if ($gambar_baru !== null) {
-                    delete_uploaded_image($data['gambar'], $upload_dir);
+                    delete_uploaded_image(
+                        $data['gambar'],
+                        $upload_dir
+                    );
                 }
+
                 header('Location: index.php');
                 exit;
             }
 
-            // Update gagal: buang gambar baru agar tidak jadi file yatim
+            // Jika update gagal, hapus gambar baru yang sudah diunggah
             if ($gambar_baru !== null) {
-                delete_uploaded_image($gambar_baru, $upload_dir);
+                delete_uploaded_image(
+                    $gambar_baru,
+                    $upload_dir
+                );
             }
+
             $pesan_error = 'Tulisan gagal diperbarui. Silakan coba kembali.';
         }
     }
