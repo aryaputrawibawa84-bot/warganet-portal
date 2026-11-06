@@ -8,7 +8,9 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../koneksi.php';
 
-if (!isset($_SESSION['id_user'], $_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+$id_user = valid_positive_int($_SESSION['id_user'] ?? null);
+
+if ($id_user === null || ($_SESSION['role'] ?? '') !== 'admin') {
     header('Location: ../login.php');
     exit;
 }
@@ -106,12 +108,45 @@ $sql .= ($tab === 'semua')
     : ' ORDER BY artikel.tanggal_dibuat DESC';
 
 $stmt = mysqli_prepare($koneksi, $sql);
-if ($tipe !== '') {
-    mysqli_stmt_bind_param($stmt, $tipe, ...$param);
+$result = false;
+$jumlah_baris = 0;
+
+if ($stmt) {
+    $bind_ok = true;
+
+    if (count($param) === 1) {
+        $bind_ok = mysqli_stmt_bind_param(
+            $stmt,
+            $tipe,
+            $param[0]
+        );
+    } elseif (count($param) === 2) {
+        $bind_ok = mysqli_stmt_bind_param(
+            $stmt,
+            $tipe,
+            $param[0],
+            $param[1]
+        );
+    }
+
+    if ($bind_ok && mysqli_stmt_execute($stmt)) {
+        $result = mysqli_stmt_get_result($stmt);
+
+        if ($result) {
+            $jumlah_baris = mysqli_num_rows($result);
+        }
+    } else {
+        error_log(
+            'WargaNet gagal mengambil daftar artikel: ' .
+            mysqli_stmt_error($stmt)
+        );
+    }
+} else {
+    error_log(
+        'WargaNet gagal menyiapkan query artikel: ' .
+        mysqli_error($koneksi)
+    );
 }
-mysqli_stmt_execute($stmt);
-$result = mysqli_stmt_get_result($stmt);
-$jumlah_baris = $result ? mysqli_num_rows($result) : 0;
 
 // Pesan hasil aksi (hanya nilai yang dikenal)
 $info = (string) ($_GET['info'] ?? '');
@@ -151,7 +186,15 @@ $pesan_info = [
                     <a href="index.php" class="list-group-item list-group-item-action bg-secondary text-white">Kelola Artikel</a>
                     <a href="kategori.php" class="list-group-item list-group-item-action bg-transparent text-light">Kelola Kategori</a>
                     <a href="pengguna.php" class="list-group-item list-group-item-action bg-transparent text-light">Kelola Pengguna</a>
-                    <a href="../logout.php" class="list-group-item list-group-item-action text-danger bg-transparent mt-5">Logout</a>
+                    <form action="../logout.php" method="POST" class="mt-5">
+                        <input type="hidden" name="csrf_token"
+                            value="<?= e(csrf_token()) ?>">
+
+                        <button type="submit"
+                                class="list-group-item list-group-item-action text-danger bg-transparent w-100 text-start border-0">
+                            Logout
+                        </button>
+                    </form>
                 </div>
             </div>
 

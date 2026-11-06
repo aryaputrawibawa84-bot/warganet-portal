@@ -8,7 +8,9 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../koneksi.php';
 
-if (!isset($_SESSION['id_user'], $_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+$id_user = valid_positive_int($_SESSION['id_user'] ?? null);
+
+if ($id_user === null || ($_SESSION['role'] ?? '') !== 'admin') {
     header('Location: ../login.php');
     exit;
 }
@@ -100,7 +102,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
                     <a href="index.php" class="list-group-item list-group-item-action bg-secondary text-white">Kelola Artikel</a>
                     <a href="kategori.php" class="list-group-item list-group-item-action bg-transparent text-light">Kelola Kategori</a>
                     <a href="pengguna.php" class="list-group-item list-group-item-action bg-transparent text-light">Kelola Pengguna</a>
-                    <a href="../logout.php" class="list-group-item list-group-item-action text-danger bg-transparent mt-5">Logout</a>
+                    <form action="../logout.php" method="POST" class="mt-5">
+                        <input type="hidden" name="csrf_token"
+                            value="<?= e(csrf_token()) ?>">
+
+                        <button type="submit"
+                                class="list-group-item list-group-item-action text-danger bg-transparent w-100 text-start border-0">
+                            Logout
+                        </button>
+                    </form>
                 </div>
             </div>
             
@@ -112,7 +122,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
                 <div class="card card-dark shadow-lg rounded-3">
                     <div class="card-body p-4">
                         <form action="" method="POST" enctype="multipart/form-data">
-                            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()); ?>">
                             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()); ?>">
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Judul Artikel</label>

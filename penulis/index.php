@@ -14,27 +14,47 @@ if (!isset($_SESSION['id_user'], $_SESSION['role']) || $_SESSION['role'] !== 'pe
     exit;
 }
 
-$id_user_aktif = (int) $_SESSION['id_user'];
+$id_user_aktif = valid_positive_int($_SESSION['id_user']);
 $keyword = trim((string) ($_GET['cari'] ?? ''));
 
-// Query HANYA mengambil artikel milik user yang sedang login (prepared statement)
+if ($id_user_aktif === false) {
+    session_destroy();
+    header("Location: ../login.php");
+    exit;
+}
+
 $sql = "SELECT artikel.*, kategori.nama_kategori
         FROM artikel
         LEFT JOIN kategori ON artikel.id_kategori = kategori.id_kategori
         WHERE artikel.id_user = ?";
+
 if ($keyword !== '') {
     $sql .= " AND artikel.judul LIKE ?";
 }
+
 $sql .= " ORDER BY artikel.tanggal_dibuat DESC";
 
 $stmt = mysqli_prepare($koneksi, $sql);
+
+if (!$stmt) {
+    error_log("Gagal menyiapkan query artikel penulis: " . mysqli_error($koneksi));
+    http_response_code(500);
+    exit("Terjadi kesalahan saat mengambil data artikel.");
+}
+
 if ($keyword !== '') {
     $like = '%' . $keyword . '%';
     mysqli_stmt_bind_param($stmt, 'is', $id_user_aktif, $like);
 } else {
     mysqli_stmt_bind_param($stmt, 'i', $id_user_aktif);
 }
-mysqli_stmt_execute($stmt);
+
+if (!mysqli_stmt_execute($stmt)) {
+    error_log("Gagal menjalankan query artikel penulis: " . mysqli_stmt_error($stmt));
+    http_response_code(500);
+    exit("Terjadi kesalahan saat mengambil data artikel.");
+}
+
 $result = mysqli_stmt_get_result($stmt);
 ?>
 <!DOCTYPE html>
@@ -66,7 +86,15 @@ $result = mysqli_stmt_get_result($stmt);
                 <div class="list-group list-group-flush border-end border-secondary h-100">
                     <a href="index.php" class="list-group-item list-group-item-action bg-secondary text-white">Artikel Saya</a>
                     <a href="../index.php" class="list-group-item list-group-item-action bg-transparent text-light" target="_blank">Lihat Web Publik</a>
-                    <a href="../logout.php" class="list-group-item list-group-item-action text-danger bg-transparent mt-5">Logout</a>
+                    <form action="../logout.php" method="POST" class="mt-5">
+                        <input type="hidden" name="csrf_token"
+                            value="<?= e(csrf_token()) ?>">
+
+                        <button type="submit"
+                                class="list-group-item list-group-item-action text-danger bg-transparent w-100 text-start border-0">
+                            Logout
+                        </button>
+                    </form>
                 </div>
             </div>
 
@@ -125,3 +153,6 @@ $result = mysqli_stmt_get_result($stmt);
     <script src="../assets/js/warganet.js?v=<?= (int) @filemtime(__DIR__ . '/../assets/js/warganet.js'); ?>"></script>
 </body>
 </html>
+<?php
+mysqli_stmt_close($stmt);
+?>

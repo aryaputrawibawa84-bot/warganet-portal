@@ -250,8 +250,16 @@
     var update = function () {
       var words = (ta.value.trim().match(/\S+/g) || []).length;
       counter.textContent = words + ' kata \u2022 \u00B1' + Math.max(1, Math.ceil(words / 200)) + ' menit baca';
+
+      // Ukur ulang tinggi TANPA membuat halaman melompat:
+      // simpan posisi scroll, batasi tinggi maksimal, lalu kembalikan posisinya.
+      var sx = window.scrollX, sy = window.scrollY, st = ta.scrollTop;
+      var maks = Math.round(window.innerHeight * 0.7);
       ta.style.height = 'auto';
-      ta.style.height = Math.max(ta.scrollHeight, 240) + 'px';
+      ta.style.height = Math.min(Math.max(ta.scrollHeight, 240), maks) + 'px';
+      ta.style.overflowY = ta.scrollHeight > maks ? 'auto' : 'hidden';
+      ta.scrollTop = st;
+      window.scrollTo(sx, sy);
     };
     ta.addEventListener('input', update);
     update();

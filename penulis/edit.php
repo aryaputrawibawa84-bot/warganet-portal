@@ -52,7 +52,14 @@ if (!$stmt) {
 }
 
 mysqli_stmt_bind_param($stmt, 'ii', $id_artikel, $id_user_aktif);
-mysqli_stmt_execute($stmt);
+
+if (!mysqli_stmt_execute($stmt)) {
+    error_log('WargaNet edit select execute failed: ' . mysqli_stmt_error($stmt));
+    mysqli_stmt_close($stmt);
+
+    http_response_code(500);
+    exit('Terjadi kesalahan saat mengambil artikel.');
+}
 
 $hasil = mysqli_stmt_get_result($stmt);
 $data = $hasil ? mysqli_fetch_assoc($hasil) : null;
@@ -240,7 +247,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
                 <div class="list-group list-group-flush border-end border-secondary h-100">
                     <a href="index.php" class="list-group-item list-group-item-action bg-secondary text-white">Artikel Saya</a>
                     <a href="../index.php" class="list-group-item list-group-item-action bg-transparent text-light" target="_blank">Lihat Web Publik</a>
-                    <a href="../logout.php" class="list-group-item list-group-item-action text-danger bg-transparent mt-5">Logout</a>
+                    <form action="../logout.php" method="POST" class="mt-5">
+                        <input type="hidden" name="csrf_token"
+                            value="<?= e(csrf_token()) ?>">
+
+                        <button type="submit"
+                                class="list-group-item list-group-item-action text-danger bg-transparent w-100 text-start border-0">
+                            Logout
+                        </button>
+                    </form>
                 </div>
             </div>
             <div class="col-md-10 px-4">

@@ -59,7 +59,15 @@ $link_dashboard = $role === 'admin' ? 'admin/index.php' : ($role === 'penulis' ?
                         <?php if ($link_dashboard !== '') : ?>
                             <a href="<?= e($link_dashboard); ?>" class="btn btn-outline-secondary rounded-pill px-4">Dashboard</a>
                         <?php endif; ?>
-                        <a href="logout.php" class="btn btn-outline-danger rounded-pill px-4">Logout</a>
+                        <form action="logout.php" method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token"
+                                value="<?= e(csrf_token()) ?>">
+
+                            <button type="submit"
+                                    class="btn btn-outline-danger rounded-pill px-4">
+                                Logout
+                            </button>
+                        </form>
                     <?php else : ?>
                         <a href="login.php" class="btn btn-primary rounded-pill px-4 fw-bold">Masuk / Daftar</a>
                     <?php endif; ?>

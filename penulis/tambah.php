@@ -1,5 +1,6 @@
 
 <?php
+// 1. Pengaturan session cookie
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 
 session_set_cookie_params([
@@ -15,7 +16,7 @@ session_start();
 require_once __DIR__ . '/../includes/security.php';
 require_once __DIR__ . '/../koneksi.php';
 
-// 1. Proteksi halaman: hanya penulis yang boleh masuk
+// 2. Proteksi halaman: hanya penulis yang boleh masuk
 $id_user = valid_positive_int($_SESSION['id_user'] ?? null);
 
 if (
@@ -27,12 +28,13 @@ if (
     exit;
 }
 
+// 3. Variabel awal
 $pesan_error = '';
 $judul_lama = '';
 $isi_lama = '';
 $kategori_lama = null;
 
-// 2. Ambil daftar kategori
+// 4. Ambil daftar kategori
 $query_kategori = mysqli_query(
     $koneksi,
     'SELECT id_kategori, nama_kategori
@@ -40,120 +42,161 @@ $query_kategori = mysqli_query(
      ORDER BY nama_kategori'
 );
 
-if (!$query_kategori) {
+$kategori_tersedia = ($query_kategori !== false);
+
+if (!$kategori_tersedia) {
     error_log('WargaNet category query failed: ' . mysqli_error($koneksi));
     $pesan_error = 'Kategori belum dapat dimuat. Silakan coba kembali.';
 }
 
-// 3. Proses penyimpanan artikel
+// 5. Proses penyimpanan artikel
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
 
-    // Validasi token CSRF
+    // Validasi CSRF
     require_csrf();
 
-    $judul = trim((string)($_POST['judul'] ?? ''));
-    $isi_artikel = trim((string)($_POST['isi_artikel'] ?? ''));
+    $judul = trim((string) ($_POST['judul'] ?? ''));
+    $isi_artikel = trim((string) ($_POST['isi_artikel'] ?? ''));
     $id_kategori = valid_positive_int($_POST['id_kategori'] ?? null);
 
-    // Simpan input agar tidak hilang ketika terjadi kesalahan
+    // Simpan input agar tidak hilang jika terjadi kesalahan
     $judul_lama = $judul;
     $isi_lama = $isi_artikel;
     $kategori_lama = $id_kategori;
 
-    // Validasi input
+    // Validasi panjang judul
+    $panjang_judul = function_exists('mb_strlen')
+        ? mb_strlen($judul, 'UTF-8')
+        : strlen($judul);
+
     if (
         $judul === '' ||
-        mb_strlen($judul) > 200 ||
+        $panjang_judul > 200 ||
         $isi_artikel === ''
     ) {
         $pesan_error = 'Judul wajib diisi (maksimal 200 karakter) dan isi artikel tidak boleh kosong.';
+
     } elseif ($id_kategori === null) {
         $pesan_error = 'Pilih kategori yang valid.';
+
+    } elseif (!$kategori_tersedia) {
+        $pesan_error = 'Kategori belum dapat dimuat. Silakan coba kembali.';
+
     } else {
 
-        // 4. Pastikan kategori benar-benar tersedia
+        // 6. Pastikan kategori benar-benar tersedia
         $check = mysqli_prepare(
             $koneksi,
-            'SELECT id_kategori FROM kategori WHERE id_kategori = ?'
+            'SELECT id_kategori
+             FROM kategori
+             WHERE id_kategori = ?'
         );
 
         if (!$check) {
             error_log('WargaNet category prepare failed: ' . mysqli_error($koneksi));
             $pesan_error = 'Terjadi kesalahan saat memeriksa kategori.';
+
         } else {
+
             mysqli_stmt_bind_param($check, 'i', $id_kategori);
-            mysqli_stmt_execute($check);
-            mysqli_stmt_store_result($check);
 
-            $validCategory = mysqli_stmt_num_rows($check) === 1;
+            if (!mysqli_stmt_execute($check)) {
 
-            mysqli_stmt_close($check);
-
-            if (!$validCategory) {
-                $pesan_error = 'Kategori yang dipilih tidak ditemukan.';
-            } else {
-
-                // 5. Validasi dan simpan gambar
-                $upload = save_uploaded_image(
-                    $_FILES['gambar'] ?? [],
-                    __DIR__ . '/../uploads'
+                error_log(
+                    'WargaNet category execute failed: ' .
+                    mysqli_stmt_error($check)
                 );
 
-                if ($upload['error'] !== null) {
-                    $pesan_error = $upload['error'];
+                $pesan_error = 'Terjadi kesalahan saat memeriksa kategori.';
+                mysqli_stmt_close($check);
+
+            } else {
+
+                mysqli_stmt_store_result($check);
+
+                $validCategory = (mysqli_stmt_num_rows($check) === 1);
+
+                mysqli_stmt_close($check);
+
+                if (!$validCategory) {
+                    $pesan_error = 'Kategori yang dipilih tidak ditemukan.';
+
                 } else {
-                    $gambar = $upload['filename'];
 
-                    // Penulis tidak boleh menerbitkan artikel sendiri
-                    $status = 'pending';
-
-                    // 6. Simpan artikel menggunakan prepared statement
-                    $stmt = mysqli_prepare(
-                        $koneksi,
-                        'INSERT INTO artikel
-                        (judul, isi_artikel, gambar, id_kategori, id_user, status)
-                        VALUES (?, ?, ?, ?, ?, ?)'
+                    // 7. Validasi dan simpan gambar
+                    $upload = save_uploaded_image(
+                        $_FILES['gambar'] ?? [],
+                        __DIR__ . '/../uploads'
                     );
 
-                    if ($stmt) {
-                        mysqli_stmt_bind_param(
-                            $stmt,
-                            'sssiis',
-                            $judul,
-                            $isi_artikel,
-                            $gambar,
-                            $id_kategori,
-                            $id_user,
-                            $status
-                        );
+                    if ($upload['error'] !== null) {
 
-                        if (mysqli_stmt_execute($stmt)) {
-                            mysqli_stmt_close($stmt);
+                        $pesan_error = $upload['error'];
 
-                            // Berhasil: kembali ke halaman artikel penulis
-                            header('Location: index.php');
-                            exit;
-                        }
-
-                        error_log(
-                            'WargaNet penulis insert failed: ' .
-                            mysqli_stmt_error($stmt)
-                        );
-
-                        mysqli_stmt_close($stmt);
                     } else {
-                        error_log(
-                            'WargaNet penulis prepare failed: ' .
-                            mysqli_error($koneksi)
-                        );
-                    }
 
-                    // 7. Hapus gambar jika penyimpanan artikel gagal
-                    if (!empty($gambar)) {
-                        @unlink(__DIR__ . '/../uploads/' . basename($gambar));
-                    }
+                        $gambar = $upload['filename'] ?? '';
 
-                    $pesan_error = 'Artikel gagal disimpan. Silakan periksa data dan coba kembali.';
+                        if ($gambar === '') {
+
+                            $pesan_error = 'Gambar gagal disimpan. Silakan coba kembali.';
+
+                        } else {
+
+                            // Penulis tidak boleh menerbitkan artikel sendiri
+                            $status = 'pending';
+
+                            // 8. Simpan artikel menggunakan prepared statement
+                            $stmt = mysqli_prepare(
+                                $koneksi,
+                                'INSERT INTO artikel
+                                (judul, isi_artikel, gambar, id_kategori, id_user, status)
+                                VALUES (?, ?, ?, ?, ?, ?)'
+                            );
+
+                            if ($stmt) {
+
+                                mysqli_stmt_bind_param(
+                                    $stmt,
+                                    'sssiis',
+                                    $judul,
+                                    $isi_artikel,
+                                    $gambar,
+                                    $id_kategori,
+                                    $id_user,
+                                    $status
+                                );
+
+                                if (mysqli_stmt_execute($stmt)) {
+
+                                    mysqli_stmt_close($stmt);
+
+                                    // Berhasil: kembali ke halaman artikel penulis
+                                    header('Location: index.php');
+                                    exit;
+                                }
+
+                                error_log(
+                                    'WargaNet penulis insert failed: ' .
+                                    mysqli_stmt_error($stmt)
+                                );
+
+                                mysqli_stmt_close($stmt);
+
+                            } else {
+
+                                error_log(
+                                    'WargaNet penulis prepare failed: ' .
+                                    mysqli_error($koneksi)
+                                );
+                            }
+
+                            // 9. Hapus gambar sementara jika penyimpanan gagal
+                            delete_uploaded_image($gambar);
+
+                            $pesan_error = 'Artikel gagal disimpan. Silakan periksa data dan coba kembali.';
+                        }
+                    }
                 }
             }
         }
@@ -167,95 +210,225 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
     <meta charset="UTF-8">
     <meta name="theme-color" content="#0B1120">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Tulis Berita Baru - Ruang Penulis WargaNet</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="../assets/css/warganet.css?v=<?= (int) @filemtime(__DIR__ . '/../assets/css/warganet.css'); ?>">
-    <script>document.documentElement.classList.add('js')</script>
+
+    <script>
+        document.documentElement.classList.add('js');
+    </script>
 </head>
+
 <body class="wn-panel">
+
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 border-bottom border-secondary">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold text-info" href="index.php">WargaNet | Ruang Penulis</a>
-            <span class="navbar-text">Halo, <?= e($_SESSION['nama_lengkap'] ?? ''); ?>!</span>
+
+            <a class="navbar-brand fw-bold text-info" href="index.php">
+                WargaNet | Ruang Penulis
+            </a>
+
+            <span class="navbar-text">
+                Halo, <?= e($_SESSION['nama_lengkap'] ?? ''); ?>!
+            </span>
+
         </div>
     </nav>
+
     <div class="container-fluid">
         <div class="row">
+
             <!-- Sidebar Kiri -->
             <div class="col-md-2">
                 <div class="list-group list-group-flush border-end border-secondary h-100">
-                    <a href="index.php" class="list-group-item list-group-item-action bg-secondary text-white">Artikel Saya</a>
-                    <a href="../index.php" class="list-group-item list-group-item-action bg-transparent text-light" target="_blank">Lihat Web Publik</a>
-                    <a href="../logout.php" class="list-group-item list-group-item-action text-danger bg-transparent mt-5">Logout</a>
+
+                    <a href="index.php"
+                       class="list-group-item list-group-item-action bg-secondary text-white">
+                        Artikel Saya
+                    </a>
+
+                    <a href="../index.php"
+                       class="list-group-item list-group-item-action bg-transparent text-light"
+                       target="_blank">
+                        Lihat Web Publik
+                    </a>
+
+                    <!-- Logout menggunakan POST dan CSRF -->
+                    <form action="../logout.php" method="POST" class="mt-5">
+
+                        <input type="hidden"
+                               name="csrf_token"
+                               value="<?= e(csrf_token()); ?>">
+
+                        <button type="submit"
+                                class="list-group-item list-group-item-action text-danger bg-transparent w-100 text-start border-0">
+                            Logout
+                        </button>
+
+                    </form>
+
                 </div>
             </div>
 
+            <!-- Konten Utama -->
             <div class="col-md-10 px-4">
+
                 <h3 class="mb-3">Tulis Berita Baru</h3>
 
                 <div class="alert alert-info bg-transparent border-info text-info py-2 mb-4">
-                    <strong>Catatan:</strong> Artikel Anda akan berstatus <em>Pending</em> hingga disetujui oleh Administrator.
+                    <strong>Catatan:</strong>
+                    Artikel Anda akan berstatus <em>Pending</em>
+                    hingga disetujui oleh Administrator.
                 </div>
 
+                <!-- Pesan Error -->
                 <?php if ($pesan_error !== '') : ?>
-                    <div class="alert alert-danger"><?= e($pesan_error); ?></div>
+
+                    <div class="alert alert-danger">
+                        <?= e($pesan_error); ?>
+                    </div>
+
                 <?php endif; ?>
 
+                <!-- Form Artikel -->
                 <div class="card card-dark shadow-lg rounded-3">
                     <div class="card-body p-4">
+
                         <form action="" method="POST" enctype="multipart/form-data">
-                            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()); ?>">
 
+                            <input type="hidden"
+                                   name="csrf_token"
+                                   value="<?= e(csrf_token()); ?>">
+
+                            <!-- Judul -->
                             <div class="mb-3">
-                                <label class="form-label fw-bold">Judul Artikel</label>
-                                <input type="text" name="judul" class="form-control" maxlength="200" required
-                                       placeholder="Masukkan judul berita..." value="<?= e($judul_lama); ?>">
+
+                                <label class="form-label fw-bold">
+                                    Judul Artikel
+                                </label>
+
+                                <input type="text"
+                                       name="judul"
+                                       class="form-control"
+                                       maxlength="200"
+                                       required
+                                       placeholder="Masukkan judul berita..."
+                                       value="<?= e($judul_lama); ?>">
+
                             </div>
 
+                            <!-- Kategori dan Gambar -->
                             <div class="row mb-3">
+
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Kategori Berita</label>
-                                    <select name="id_kategori" class="form-select" required>
-                                        <option value="">-- Pilih Kategori --</option>
+
+                                    <label class="form-label fw-bold">
+                                        Kategori Berita
+                                    </label>
+
+                                    <select name="id_kategori"
+                                            class="form-select"
+                                            required
+                                            <?= !$kategori_tersedia ? 'disabled' : ''; ?>>
+
+                                        <option value="">
+                                            -- Pilih Kategori --
+                                        </option>
+
                                         <?php if ($query_kategori && mysqli_num_rows($query_kategori) > 0) : ?>
+
                                             <?php while ($kat = mysqli_fetch_assoc($query_kategori)) : ?>
-                                                <option value="<?= (int)$kat['id_kategori']; ?>"
-                                                    <?= ($kategori_lama === (int)$kat['id_kategori']) ? 'selected' : ''; ?>>
+
+                                                <option
+                                                    value="<?= (int) $kat['id_kategori']; ?>"
+                                                    <?= ($kategori_lama === (int) $kat['id_kategori']) ? 'selected' : ''; ?>>
+
                                                     <?= e($kat['nama_kategori']); ?>
+
                                                 </option>
+
                                             <?php endwhile; ?>
+
                                         <?php else : ?>
-                                            <option value="" disabled>Belum ada kategori tersedia</option>
+
+                                            <option value="" disabled>
+                                                Belum ada kategori tersedia
+                                            </option>
+
                                         <?php endif; ?>
+
                                     </select>
+
                                 </div>
+
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Gambar Sampul</label>
-                                    <input type="file" name="gambar" class="form-control"
-                                           accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+
+                                    <label class="form-label fw-bold">
+                                        Gambar Sampul
+                                    </label>
+
+                                    <input type="file"
+                                           name="gambar"
+                                           class="form-control"
+                                           accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                                           required>
+
                                 </div>
+
                             </div>
 
+                            <!-- Isi Artikel -->
                             <div class="mb-4">
-                                <label class="form-label fw-bold">Isi Artikel</label>
-                                <textarea name="isi_artikel" class="form-control" rows="10" required
+
+                                <label class="form-label fw-bold">
+                                    Isi Artikel
+                                </label>
+
+                                <textarea name="isi_artikel"
+                                          class="form-control"
+                                          rows="10"
+                                          required
                                           placeholder="Ketik isi berita lengkap di sini..."><?= e($isi_lama); ?></textarea>
+
                             </div>
 
+                            <!-- Tombol -->
                             <div class="d-flex justify-content-end gap-2">
-                                <a href="index.php" class="btn btn-outline-secondary px-4">Batal</a>
-                                <button type="submit" name="simpan" class="btn btn-primary px-5">Kirim untuk Ditinjau</button>
+
+                                <a href="index.php"
+                                   class="btn btn-outline-secondary px-4">
+                                    Batal
+                                </a>
+
+                                <button type="submit"
+                                        name="simpan"
+                                        class="btn btn-primary px-5"
+                                        <?= !$kategori_tersedia ? 'disabled' : ''; ?>>
+                                    Kirim untuk Ditinjau
+                                </button>
+
                             </div>
+
                         </form>
+
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
+
     <script src="../assets/js/warganet.js?v=<?= (int) @filemtime(__DIR__ . '/../assets/js/warganet.js'); ?>"></script>
+
 </body>
 </html>

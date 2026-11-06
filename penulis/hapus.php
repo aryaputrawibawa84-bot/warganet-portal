@@ -60,10 +60,18 @@ if (!$stmt) {
 }
 
 mysqli_stmt_bind_param($stmt, 'ii', $id, $userId);
-mysqli_stmt_execute($stmt);
+
+if (!mysqli_stmt_execute($stmt)) {
+    error_log('WargaNet delete select execute failed: ' . mysqli_stmt_error($stmt));
+    mysqli_stmt_close($stmt);
+    header('Location: index.php');
+    exit;
+}
 
 $res = mysqli_stmt_get_result($stmt);
 $row = $res ? mysqli_fetch_assoc($res) : null;
+
+mysqli_stmt_close($stmt);
 
 mysqli_stmt_close($stmt);
 
