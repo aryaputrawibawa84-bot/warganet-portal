@@ -75,44 +75,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } else {
 
-            $stmt = mysqli_prepare(
+            // Periksa apakah pengguna tersedia dan ambil role sebelumnya.
+            $cek = mysqli_prepare(
                 $koneksi,
-                'UPDATE users SET role = ? WHERE id_user = ?'
+                'SELECT role FROM users WHERE id_user = ? LIMIT 1'
             );
 
-            if ($stmt) {
+            if ($cek) {
 
-                mysqli_stmt_bind_param(
-                    $stmt,
-                    'si',
-                    $role_baru,
-                    $id_target
-                );
+                mysqli_stmt_bind_param($cek, 'i', $id_target);
 
-                if (mysqli_stmt_execute($stmt)) {
+                if (mysqli_stmt_execute($cek)) {
 
-                    if (mysqli_stmt_affected_rows($stmt) >= 0) {
-                        $pesan = 'Proses perubahan hak akses berhasil.';
-                        $jenis_pesan = 'success';
+                    $hasil = mysqli_stmt_get_result($cek);
+                    $data_user = $hasil ? mysqli_fetch_assoc($hasil) : null;
+
+                    mysqli_stmt_close($cek);
+
+                    if (!$data_user) {
+
+                        $pesan = 'Pengguna tidak ditemukan.';
+                        $jenis_pesan = 'warning';
+
+                    } elseif ($data_user['role'] === $role_baru) {
+
+                        $pesan = 'Pengguna tersebut sudah memiliki hak akses yang dipilih.';
+                        $jenis_pesan = 'info';
+
+                    } else {
+
+                        // Jalankan perubahan hak akses.
+                        $stmt = mysqli_prepare(
+                            $koneksi,
+                            'UPDATE users SET role = ? WHERE id_user = ?'
+                        );
+
+                        if ($stmt) {
+
+                            mysqli_stmt_bind_param(
+                                $stmt,
+                                'si',
+                                $role_baru,
+                                $id_target
+                            );
+
+                            if (mysqli_stmt_execute($stmt)) {
+
+                                if (mysqli_stmt_affected_rows($stmt) === 1) {
+                                    $pesan = 'Hak akses pengguna berhasil diperbarui.';
+                                    $jenis_pesan = 'success';
+                                } else {
+                                    $pesan = 'Hak akses tidak berhasil diperbarui. Silakan coba kembali.';
+                                    $jenis_pesan = 'warning';
+                                }
+
+                            } else {
+
+                                error_log(
+                                    'WargaNet update user role failed: ' .
+                                    mysqli_stmt_error($stmt)
+                                );
+
+                                $pesan = 'Gagal memperbarui hak akses pengguna.';
+                                $jenis_pesan = 'danger';
+                            }
+
+                            mysqli_stmt_close($stmt);
+
+                        } else {
+
+                            error_log(
+                                'WargaNet update role prepare failed: ' .
+                                mysqli_error($koneksi)
+                            );
+
+                            $pesan = 'Terjadi kesalahan pada database.';
+                            $jenis_pesan = 'danger';
+                        }
                     }
 
                 } else {
 
                     error_log(
-                        'WargaNet update user role failed: ' .
-                        mysqli_stmt_error($stmt)
+                        'WargaNet check user role failed: ' .
+                        mysqli_stmt_error($cek)
                     );
 
-                    $pesan = 'Gagal memperbarui hak akses pengguna.';
+                    mysqli_stmt_close($cek);
+
+                    $pesan = 'Gagal memeriksa data pengguna.';
                     $jenis_pesan = 'danger';
                 }
-
-                mysqli_stmt_close($stmt);
 
             } else {
 
                 error_log(
-                    'WargaNet update role prepare failed: ' .
+                    'WargaNet check user prepare failed: ' .
                     mysqli_error($koneksi)
                 );
 
@@ -443,14 +501,15 @@ if ($stmtUsers) {
 
                                                         <button type="submit"
                                                                 name="ubah_role"
-                                                                class="btn btn-sm btn-success">
+                                                                class="btn btn-sm btn-success"
+                                                                onclick="return konfirmasiPerubahanRole(this.form);">
                                                             Simpan
                                                         </button>
 
                                                         <button type="submit"
                                                                 name="hapus_user"
                                                                 class="btn btn-sm btn-outline-danger"
-                                                                onclick="return confirm('Hapus akun ini permanen?');">
+                                                                onclick="return confirm('Hapus akun ini secara permanen?');">
                                                             Hapus
                                                         </button>
 
@@ -508,6 +567,20 @@ if ($stmtUsers) {
 
     </div>
 
+
+    <script>
+        function konfirmasiPerubahanRole(form) {
+            const roleBaru = form.querySelector('select[name="role_baru"]').value;
+
+            if (roleBaru === 'admin') {
+                return confirm(
+                    'Apakah kamu yakin ingin memberikan hak akses ADMIN kepada pengguna ini?'
+                );
+            }
+
+            return true;
+        }
+    </script>
 
     <script src="../assets/js/warganet.js"></script>
 

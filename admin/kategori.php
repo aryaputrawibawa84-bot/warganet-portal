@@ -47,7 +47,6 @@ $jenis_pesan = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // Validasi CSRF
     require_csrf();
 
     // --------------------------------------
@@ -58,41 +57,107 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $nama_kategori = trim((string)($_POST['nama_kategori'] ?? ''));
 
-        if ($nama_kategori === '' || mb_strlen($nama_kategori) > 100) {
+        $panjang_nama = function_exists('mb_strlen')
+            ? mb_strlen($nama_kategori, 'UTF-8')
+            : strlen($nama_kategori);
+
+        if ($nama_kategori === '' || $panjang_nama > 100) {
 
             $pesan = 'Nama kategori wajib diisi dan maksimal 100 karakter.';
             $jenis_pesan = 'danger';
 
         } else {
 
-            $stmt = mysqli_prepare(
+            // Periksa kategori duplikat.
+            $cek = mysqli_prepare(
                 $koneksi,
-                'INSERT INTO kategori (nama_kategori) VALUES (?)'
+                'SELECT id_kategori
+                 FROM kategori
+                 WHERE LOWER(nama_kategori) = LOWER(?)
+                 LIMIT 1'
             );
 
-            if ($stmt) {
+            if ($cek) {
 
-                mysqli_stmt_bind_param($stmt, 's', $nama_kategori);
+                mysqli_stmt_bind_param($cek, 's', $nama_kategori);
 
-                if (mysqli_stmt_execute($stmt)) {
-                    $pesan = 'Kategori berhasil ditambahkan!';
-                    $jenis_pesan = 'success';
+                if (mysqli_stmt_execute($cek)) {
+
+                    $hasil = mysqli_stmt_get_result($cek);
+                    $kategori_ada = $hasil
+                        ? mysqli_fetch_assoc($hasil)
+                        : null;
+
+                    mysqli_stmt_close($cek);
+
+                    if ($kategori_ada) {
+
+                        $pesan = 'Kategori dengan nama tersebut sudah tersedia.';
+                        $jenis_pesan = 'warning';
+
+                    } else {
+
+                        // Tambahkan kategori jika belum tersedia.
+                        $stmt = mysqli_prepare(
+                            $koneksi,
+                            'INSERT INTO kategori (nama_kategori) VALUES (?)'
+                        );
+
+                        if ($stmt) {
+
+                            mysqli_stmt_bind_param(
+                                $stmt,
+                                's',
+                                $nama_kategori
+                            );
+
+                            if (mysqli_stmt_execute($stmt)) {
+
+                                $pesan = 'Kategori berhasil ditambahkan!';
+                                $jenis_pesan = 'success';
+
+                            } else {
+
+                                error_log(
+                                    'WargaNet add category failed: ' .
+                                    mysqli_stmt_error($stmt)
+                                );
+
+                                $pesan = 'Gagal menambahkan kategori.';
+                                $jenis_pesan = 'danger';
+                            }
+
+                            mysqli_stmt_close($stmt);
+
+                        } else {
+
+                            error_log(
+                                'WargaNet category insert prepare failed: ' .
+                                mysqli_error($koneksi)
+                            );
+
+                            $pesan = 'Terjadi kesalahan pada database.';
+                            $jenis_pesan = 'danger';
+                        }
+                    }
+
                 } else {
+
                     error_log(
-                        'WargaNet add category failed: ' .
-                        mysqli_stmt_error($stmt)
+                        'WargaNet category duplicate check failed: ' .
+                        mysqli_stmt_error($cek)
                     );
 
-                    $pesan = 'Gagal menambahkan kategori.';
+                    mysqli_stmt_close($cek);
+
+                    $pesan = 'Gagal memeriksa nama kategori.';
                     $jenis_pesan = 'danger';
                 }
-
-                mysqli_stmt_close($stmt);
 
             } else {
 
                 error_log(
-                    'WargaNet category prepare failed: ' .
+                    'WargaNet category check prepare failed: ' .
                     mysqli_error($koneksi)
                 );
 
@@ -118,42 +183,103 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } else {
 
-            $stmt = mysqli_prepare(
+            // Periksa apakah kategori masih digunakan artikel.
+            $cek = mysqli_prepare(
                 $koneksi,
-                'DELETE FROM kategori WHERE id_kategori = ?'
+                'SELECT COUNT(*) AS jumlah
+                 FROM artikel
+                 WHERE id_kategori = ?'
             );
 
-            if ($stmt) {
+            if ($cek) {
 
-                mysqli_stmt_bind_param($stmt, 'i', $id_hapus);
+                mysqli_stmt_bind_param($cek, 'i', $id_hapus);
 
-                if (mysqli_stmt_execute($stmt)) {
+                if (mysqli_stmt_execute($cek)) {
 
-                    if (mysqli_stmt_affected_rows($stmt) === 1) {
-                        $pesan = 'Kategori berhasil dihapus.';
-                        $jenis_pesan = 'success';
-                    } else {
-                        $pesan = 'Kategori tidak ditemukan atau tidak dapat dihapus.';
+                    $hasil = mysqli_stmt_get_result($cek);
+                    $data = $hasil ? mysqli_fetch_assoc($hasil) : null;
+
+                    mysqli_stmt_close($cek);
+
+                    if (!$data) {
+
+                        $pesan = 'Gagal memeriksa penggunaan kategori.';
+                        $jenis_pesan = 'danger';
+
+                    } elseif ((int)$data['jumlah'] > 0) {
+
+                        $pesan = 'Kategori tidak dapat dihapus karena masih digunakan oleh artikel.';
                         $jenis_pesan = 'warning';
+
+                    } else {
+
+                        // Hapus kategori jika tidak digunakan.
+                        $stmt = mysqli_prepare(
+                            $koneksi,
+                            'DELETE FROM kategori WHERE id_kategori = ?'
+                        );
+
+                        if ($stmt) {
+
+                            mysqli_stmt_bind_param(
+                                $stmt,
+                                'i',
+                                $id_hapus
+                            );
+
+                            if (mysqli_stmt_execute($stmt)) {
+
+                                if (mysqli_stmt_affected_rows($stmt) === 1) {
+                                    $pesan = 'Kategori berhasil dihapus.';
+                                    $jenis_pesan = 'success';
+                                } else {
+                                    $pesan = 'Kategori tidak ditemukan.';
+                                    $jenis_pesan = 'warning';
+                                }
+
+                            } else {
+
+                                error_log(
+                                    'WargaNet delete category failed: ' .
+                                    mysqli_stmt_error($stmt)
+                                );
+
+                                $pesan = 'Kategori gagal dihapus. Silakan periksa kembali data kategori.';
+                                $jenis_pesan = 'danger';
+                            }
+
+                            mysqli_stmt_close($stmt);
+
+                        } else {
+
+                            error_log(
+                                'WargaNet category delete prepare failed: ' .
+                                mysqli_error($koneksi)
+                            );
+
+                            $pesan = 'Terjadi kesalahan pada database.';
+                            $jenis_pesan = 'danger';
+                        }
                     }
 
                 } else {
 
                     error_log(
-                        'WargaNet delete category failed: ' .
-                        mysqli_stmt_error($stmt)
+                        'WargaNet category usage check failed: ' .
+                        mysqli_stmt_error($cek)
                     );
 
-                    $pesan = 'Kategori gagal dihapus. Periksa apakah kategori masih digunakan oleh artikel.';
+                    mysqli_stmt_close($cek);
+
+                    $pesan = 'Gagal memeriksa penggunaan kategori.';
                     $jenis_pesan = 'danger';
                 }
-
-                mysqli_stmt_close($stmt);
 
             } else {
 
                 error_log(
-                    'WargaNet delete category prepare failed: ' .
+                    'WargaNet category usage prepare failed: ' .
                     mysqli_error($koneksi)
                 );
 
@@ -171,11 +297,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $query_kategori = mysqli_query(
     $koneksi,
-    'SELECT id_kategori, nama_kategori FROM kategori ORDER BY id_kategori DESC'
+    'SELECT id_kategori, nama_kategori
+     FROM kategori
+     ORDER BY id_kategori DESC'
 );
 
 if (!$query_kategori) {
-    error_log('WargaNet category list failed: ' . mysqli_error($koneksi));
+    error_log(
+        'WargaNet category list failed: ' .
+        mysqli_error($koneksi)
+    );
 }
 
 ?>
@@ -209,6 +340,7 @@ if (!$query_kategori) {
 
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 border-bottom border-secondary">
+
         <div class="container-fluid">
 
             <a class="navbar-brand fw-bold" href="#">
@@ -220,10 +352,12 @@ if (!$query_kategori) {
             </span>
 
         </div>
+
     </nav>
 
 
     <div class="container-fluid">
+
         <div class="row">
 
             <!-- SIDEBAR -->
@@ -261,6 +395,7 @@ if (!$query_kategori) {
                     </form>
 
                 </div>
+
             </div>
 
 
@@ -325,7 +460,9 @@ if (!$query_kategori) {
                                 </form>
 
                             </div>
+
                         </div>
+
                     </div>
 
 
@@ -336,86 +473,104 @@ if (!$query_kategori) {
 
                             <div class="card-body p-0">
 
-                                <table class="table table-dark table-hover table-striped mb-0">
+                                <div class="table-responsive">
 
-                                    <thead>
-                                        <tr>
-                                            <th width="10%">No</th>
-                                            <th>Nama Kategori</th>
-                                            <th width="20%">Aksi</th>
-                                        </tr>
-                                    </thead>
+                                    <table class="table table-dark table-hover table-striped mb-0">
 
-                                    <tbody>
+                                        <thead>
 
-                                        <?php if ($query_kategori && mysqli_num_rows($query_kategori) > 0) : ?>
+                                            <tr>
+                                                <th width="10%">No</th>
+                                                <th>Nama Kategori</th>
+                                                <th width="20%">Aksi</th>
+                                            </tr>
 
-                                            <?php $no = 1; ?>
+                                        </thead>
 
-                                            <?php while ($row = mysqli_fetch_assoc($query_kategori)) : ?>
+                                        <tbody>
+
+                                            <?php if ($query_kategori && mysqli_num_rows($query_kategori) > 0) : ?>
+
+                                                <?php $no = 1; ?>
+
+                                                <?php while ($row = mysqli_fetch_assoc($query_kategori)) : ?>
+
+                                                    <tr>
+
+                                                        <td>
+                                                            <?= $no++; ?>
+                                                        </td>
+
+                                                        <td>
+                                                            <?= e($row['nama_kategori']); ?>
+                                                        </td>
+
+                                                        <td>
+
+                                                            <form action="kategori.php"
+                                                                  method="POST"
+                                                                  class="d-inline"
+                                                                  onsubmit="return confirm('Hapus kategori ini?');">
+
+                                                                <input type="hidden"
+                                                                       name="csrf_token"
+                                                                       value="<?= e(csrf_token()); ?>">
+
+                                                                <input type="hidden"
+                                                                       name="id_kategori"
+                                                                       value="<?= (int)$row['id_kategori']; ?>">
+
+                                                                <button type="submit"
+                                                                        name="hapus_kategori"
+                                                                        class="btn btn-sm btn-danger">
+                                                                    Hapus
+                                                                </button>
+
+                                                            </form>
+
+                                                        </td>
+
+                                                    </tr>
+
+                                                <?php endwhile; ?>
+
+                                            <?php else : ?>
 
                                                 <tr>
 
-                                                    <td>
-                                                        <?= $no++; ?>
-                                                    </td>
+                                                    <td colspan="3" class="text-center py-4 text-secondary">
 
-                                                    <td>
-                                                        <?= e($row['nama_kategori']); ?>
-                                                    </td>
-
-                                                    <td>
-
-                                                        <form action="kategori.php"
-                                                              method="POST"
-                                                              class="d-inline"
-                                                              onsubmit="return confirm('Hapus kategori ini?');">
-
-                                                            <input type="hidden"
-                                                                   name="csrf_token"
-                                                                   value="<?= e(csrf_token()); ?>">
-
-                                                            <input type="hidden"
-                                                                   name="id_kategori"
-                                                                   value="<?= (int)$row['id_kategori']; ?>">
-
-                                                            <button type="submit"
-                                                                    name="hapus_kategori"
-                                                                    class="btn btn-sm btn-danger">
-                                                                Hapus
-                                                            </button>
-
-                                                        </form>
+                                                        <?php if ($query_kategori === false) : ?>
+                                                            Data kategori belum dapat dimuat.
+                                                        <?php else : ?>
+                                                            Belum ada kategori tersedia.
+                                                        <?php endif; ?>
 
                                                     </td>
 
                                                 </tr>
 
-                                            <?php endwhile; ?>
+                                            <?php endif; ?>
 
-                                        <?php else : ?>
+                                        </tbody>
 
-                                            <tr>
-                                                <td colspan="3" class="text-center py-4 text-secondary">
-                                                    Belum ada kategori tersedia.
-                                                </td>
-                                            </tr>
+                                    </table>
 
-                                        <?php endif; ?>
-
-                                    </tbody>
-
-                                </table>
+                                </div>
 
                             </div>
+
                         </div>
+
                     </div>
 
                 </div>
 
+
             </div>
 
         </div>
+
     </div>
 
 

@@ -5,8 +5,8 @@ session_set_cookie_params([
     'httponly' => true, 'samesite' => 'Lax'
 ]);
 session_start();
-require_once '../includes/security.php';
-require '../koneksi.php';
+require_once __DIR__ . '/../includes/security.php';
+require __DIR__ . '/../koneksi.php';
 
 // Proteksi: Hanya yang berstatus 'penulis' yang boleh masuk
 if (!isset($_SESSION['id_user'], $_SESSION['role']) || $_SESSION['role'] !== 'penulis') {
@@ -17,7 +17,8 @@ if (!isset($_SESSION['id_user'], $_SESSION['role']) || $_SESSION['role'] !== 'pe
 $id_user_aktif = valid_positive_int($_SESSION['id_user']);
 $keyword = trim((string) ($_GET['cari'] ?? ''));
 
-if ($id_user_aktif === false) {
+if ($id_user_aktif === null) {
+    $_SESSION = [];
     session_destroy();
     header("Location: ../login.php");
     exit;

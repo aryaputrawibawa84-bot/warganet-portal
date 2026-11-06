@@ -1,44 +1,72 @@
-
+```php
 <?php
-/** Helper keamanan sederhana untuk WargaNet. */
+/**
+ * Helper keamanan sederhana untuk WargaNet.
+ */
 
 // 1. Mencegah XSS saat menampilkan data
-function e($value): string {
+
+/**
+ * @param mixed $value
+ */
+function e($value): string
+{
     return htmlspecialchars(
-        (string)($value ?? ''),
+        (string) ($value ?? ''),
         ENT_QUOTES | ENT_SUBSTITUTE,
         'UTF-8'
     );
 }
 
+
 // 2. Membuat token CSRF
-function csrf_token(): string {
-    if (empty($_SESSION['csrf_token'])) {
+
+function csrf_token(): string
+{
+    if (
+        !isset($_SESSION['csrf_token']) ||
+        !is_string($_SESSION['csrf_token']) ||
+        $_SESSION['csrf_token'] === ''
+    ) {
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     }
 
     return $_SESSION['csrf_token'];
 }
 
+
 // 3. Memvalidasi token CSRF
-function csrf_validate(): bool {
+
+function csrf_validate(): bool
+{
     $submitted = $_POST['csrf_token'] ?? '';
+    $sessionToken = $_SESSION['csrf_token'] ?? null;
 
     return is_string($submitted)
-        && isset($_SESSION['csrf_token'])
-        && hash_equals($_SESSION['csrf_token'], $submitted);
+        && is_string($sessionToken)
+        && $sessionToken !== ''
+        && hash_equals($sessionToken, $submitted);
 }
 
+
 // 4. Menolak permintaan tanpa token CSRF valid
-function require_csrf(): void {
+
+function require_csrf(): void
+{
     if (!csrf_validate()) {
         http_response_code(403);
         exit('Permintaan ditolak. Muat ulang halaman dan coba kembali.');
     }
 }
 
+
 // 5. Memvalidasi bilangan bulat positif
-function valid_positive_int($value): ?int {
+
+/**
+ * @param mixed $value
+ */
+function valid_positive_int($value): ?int
+{
     $number = filter_var(
         $value,
         FILTER_VALIDATE_INT,
@@ -48,9 +76,11 @@ function valid_positive_int($value): ?int {
     return $number === false ? null : $number;
 }
 
-// 6. Memvalidasi dan menyimpan gambar JPG/PNG
-function save_uploaded_image(array $file, string $targetDirectory): array {
 
+// 6. Memvalidasi dan menyimpan gambar JPG/PNG
+
+function save_uploaded_image(array $file, string $targetDirectory): array
+{
     // Memeriksa data upload
     if (!isset($file['error']) || is_array($file['error'])) {
         return [
@@ -80,6 +110,8 @@ function save_uploaded_image(array $file, string $targetDirectory): array {
     // Memeriksa file sementara
     if (
         !isset($file['tmp_name'], $file['size']) ||
+        !is_string($file['tmp_name']) ||
+        $file['tmp_name'] === '' ||
         !is_uploaded_file($file['tmp_name'])
     ) {
         return [
@@ -88,8 +120,18 @@ function save_uploaded_image(array $file, string $targetDirectory): array {
         ];
     }
 
+    // Memastikan ukuran file berupa angka
+    if (!is_numeric($file['size'])) {
+        return [
+            'filename' => null,
+            'error' => 'Ukuran gambar tidak valid.'
+        ];
+    }
+
+    $fileSize = (int) $file['size'];
+
     // Maksimal ukuran gambar 2 MB
-    if ($file['size'] < 1 || $file['size'] > 2 * 1024 * 1024) {
+    if ($fileSize < 1 || $fileSize > 2 * 1024 * 1024) {
         return [
             'filename' => null,
             'error' => 'Ukuran gambar maksimal 2MB.'
@@ -97,6 +139,15 @@ function save_uploaded_image(array $file, string $targetDirectory): array {
     }
 
     // Memeriksa MIME gambar
+    if (!class_exists('finfo')) {
+        error_log('WargaNet upload failed: PHP fileinfo extension is unavailable.');
+
+        return [
+            'filename' => null,
+            'error' => 'Server belum mendukung pemeriksaan gambar.'
+        ];
+    }
+
     $finfo = new finfo(FILEINFO_MIME_TYPE);
     $mime = $finfo->file($file['tmp_name']);
 
@@ -146,8 +197,7 @@ function save_uploaded_image(array $file, string $targetDirectory): array {
     }
 
     // Membuat nama file acak
-    $filename = bin2hex(random_bytes(16))
-        . '.' . $allowed[$mime];
+    $filename = bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
 
     $destination = rtrim(
         $targetDirectory,
@@ -169,17 +219,32 @@ function save_uploaded_image(array $file, string $targetDirectory): array {
 }
 
 
-/** Hapus file gambar di folder upload dengan aman (mencegah path traversal). */
-function delete_uploaded_image(?string $filename, string $directory): void {
+/**
+ * Hapus file gambar di folder upload dengan aman
+ * untuk mencegah path traversal.
+ */
+
+function delete_uploaded_image(?string $filename, string $directory): void
+{
     if ($filename === null || $filename === '') {
         return;
     }
+
     $base = realpath($directory);
+
     if ($base === false) {
         return;
     }
-    $file = realpath($base . DIRECTORY_SEPARATOR . basename($filename));
-    if ($file !== false && strpos($file, $base . DIRECTORY_SEPARATOR) === 0 && is_file($file)) {
+
+    $file = realpath(
+        $base . DIRECTORY_SEPARATOR . basename($filename)
+    );
+
+    if (
+        $file !== false &&
+        strpos($file, $base . DIRECTORY_SEPARATOR) === 0 &&
+        is_file($file)
+    ) {
         @unlink($file);
     }
 }

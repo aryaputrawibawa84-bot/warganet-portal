@@ -82,6 +82,7 @@ if ($query_kategori) {
     }
 } else {
     error_log('WargaNet gagal mengambil kategori: ' . mysqli_error($koneksi));
+    $pesan_error = 'Daftar kategori gagal dimuat. Silakan muat ulang halaman.';
 }
 
 // Status artikel yang diizinkan

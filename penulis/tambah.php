@@ -192,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
                             }
 
                             // 9. Hapus gambar sementara jika penyimpanan gagal
-                            delete_uploaded_image($gambar);
+                            delete_uploaded_image($gambar, __DIR__ . '/../uploads');
 
                             $pesan_error = 'Artikel gagal disimpan. Silakan periksa data dan coba kembali.';
                         }

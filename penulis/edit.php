@@ -113,7 +113,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan'])) {
         // Jangan lanjutkan jika kategori gagal dimuat.
     } elseif (
         $form['judul'] === '' ||
-        mb_strlen($form['judul']) > 200 ||
+        (function_exists('mb_strlen')
+            ? mb_strlen($form['judul'], 'UTF-8')
+            : strlen($form['judul'])) > 200 ||
         $form['isi_artikel'] === ''
     ) {
         $pesan_error = 'Judul wajib diisi (maksimal 200 karakter) dan isi tulisan tidak boleh kosong.';

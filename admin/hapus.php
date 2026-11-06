@@ -9,11 +9,10 @@ session_set_cookie_params([
     'httponly' => true,
     'samesite' => 'Lax'
 ]);
-
 session_start();
 
-require_once '../includes/security.php';
-require '../koneksi.php';
+require_once __DIR__ . '/../includes/security.php';
+require __DIR__ . '/../koneksi.php';
 
 // Pastikan pengguna adalah admin
 $id_user = valid_positive_int($_SESSION['id_user'] ?? null);

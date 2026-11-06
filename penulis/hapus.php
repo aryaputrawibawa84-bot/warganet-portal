@@ -73,8 +73,6 @@ $row = $res ? mysqli_fetch_assoc($res) : null;
 
 mysqli_stmt_close($stmt);
 
-mysqli_stmt_close($stmt);
-
 // 7. Jika artikel ditemukan, lakukan penghapusan
 if ($row) {
 
@@ -105,28 +103,10 @@ if ($row) {
 
     // 8. Hapus gambar hanya jika artikel berhasil dihapus
     if ($berhasil && !empty($row['gambar'])) {
-
-        $nama_gambar = basename((string) $row['gambar']);
-
-        $upload_dir = realpath(__DIR__ . '/../uploads');
-
-        if ($upload_dir !== false) {
-
-            $file = realpath(
-                $upload_dir . DIRECTORY_SEPARATOR . $nama_gambar
-            );
-
-            // Pastikan file benar-benar berada di dalam folder uploads
-            if (
-                $file !== false &&
-                strpos($file, $upload_dir . DIRECTORY_SEPARATOR) === 0 &&
-                is_file($file)
-            ) {
-                if (!unlink($file)) {
-                    error_log('WargaNet failed to delete image: ' . $nama_gambar);
-                }
-            }
-        }
+        delete_uploaded_image(
+            $row['gambar'],
+            __DIR__ . '/../uploads'
+        );
     }
 }
 
