@@ -1,4 +1,3 @@
-
 <?php
 
 // Batasi agar file hanya dapat dijalankan melalui terminal (CLI).

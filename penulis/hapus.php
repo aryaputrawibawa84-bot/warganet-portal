@@ -1,4 +1,3 @@
-
 <?php
 // 1. Pengaturan session cookie
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
@@ -14,6 +13,7 @@ session_set_cookie_params([
 session_start();
 
 require_once __DIR__ . '/../includes/security.php';
+require_once __DIR__ . '/../includes/tampilan.php';
 require_once __DIR__ . '/../koneksi.php';
 
 // 2. Pastikan hanya penulis yang dapat mengakses
@@ -44,38 +44,70 @@ if ($id === null) {
     exit;
 }
 
-// 6. Ambil gambar artikel milik penulis yang sedang login
-$stmt = mysqli_prepare(
-    $koneksi,
-    'SELECT gambar
-     FROM artikel
-     WHERE id_artikel = ? AND id_user = ?
-     LIMIT 1'
-);
+$gambar_lama = null;
+$berhasil = false;
 
-if (!$stmt) {
-    error_log('WargaNet delete select prepare failed: ' . mysqli_error($koneksi));
+// 6. Mulai transaksi database
+if (!mysqli_begin_transaction($koneksi)) {
+    error_log(
+        'WargaNet delete transaction begin failed: ' .
+        mysqli_error($koneksi)
+    );
+
     header('Location: index.php');
     exit;
 }
 
-mysqli_stmt_bind_param($stmt, 'ii', $id, $userId);
+try {
 
-if (!mysqli_stmt_execute($stmt)) {
-    error_log('WargaNet delete select execute failed: ' . mysqli_stmt_error($stmt));
+    // 7. Ambil gambar artikel sekaligus memastikan kepemilikan
+    $stmt = mysqli_prepare(
+        $koneksi,
+        'SELECT gambar
+         FROM artikel
+         WHERE id_artikel = ? AND id_user = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        throw new RuntimeException(
+            'Delete select prepare failed: ' . mysqli_error($koneksi)
+        );
+    }
+
+    if (!mysqli_stmt_bind_param($stmt, 'ii', $id, $userId)) {
+        $error = mysqli_stmt_error($stmt);
+        mysqli_stmt_close($stmt);
+
+        throw new RuntimeException(
+            'Delete select bind failed: ' . $error
+        );
+    }
+
+    if (!mysqli_stmt_execute($stmt)) {
+        $error = mysqli_stmt_error($stmt);
+        mysqli_stmt_close($stmt);
+
+        throw new RuntimeException(
+            'Delete select execute failed: ' . $error
+        );
+    }
+
+    $res = mysqli_stmt_get_result($stmt);
+    $row = $res ? mysqli_fetch_assoc($res) : null;
+
     mysqli_stmt_close($stmt);
-    header('Location: index.php');
-    exit;
-}
 
-$res = mysqli_stmt_get_result($stmt);
-$row = $res ? mysqli_fetch_assoc($res) : null;
+    // Artikel tidak ditemukan atau bukan milik penulis
+    if (!$row) {
+        mysqli_rollback($koneksi);
+        header('Location: index.php');
+        exit;
+    }
 
-mysqli_stmt_close($stmt);
+    $gambar_lama = (string) ($row['gambar'] ?? '');
 
-// 7. Jika artikel ditemukan, lakukan penghapusan
-if ($row) {
-
+    // 8. Hapus artikel dengan pemeriksaan kepemilikan
     $del = mysqli_prepare(
         $koneksi,
         'DELETE FROM artikel
@@ -83,33 +115,66 @@ if ($row) {
     );
 
     if (!$del) {
-        error_log('WargaNet delete prepare failed: ' . mysqli_error($koneksi));
-        header('Location: index.php');
-        exit;
+        throw new RuntimeException(
+            'Delete prepare failed: ' . mysqli_error($koneksi)
+        );
     }
 
-    mysqli_stmt_bind_param($del, 'ii', $id, $userId);
+    if (!mysqli_stmt_bind_param($del, 'ii', $id, $userId)) {
+        $error = mysqli_stmt_error($del);
+        mysqli_stmt_close($del);
 
-    $execute = mysqli_stmt_execute($del);
+        throw new RuntimeException(
+            'Delete bind failed: ' . $error
+        );
+    }
+
+    if (!mysqli_stmt_execute($del)) {
+        $error = mysqli_stmt_error($del);
+        mysqli_stmt_close($del);
+
+        throw new RuntimeException(
+            'Delete execute failed: ' . $error
+        );
+    }
 
     // Pastikan tepat satu artikel berhasil dihapus
-    $berhasil = $execute && mysqli_stmt_affected_rows($del) === 1;
-
-    if (!$execute) {
-        error_log('WargaNet delete execute failed: ' . mysqli_stmt_error($del));
-    }
+    $jumlah_dihapus = mysqli_stmt_affected_rows($del);
 
     mysqli_stmt_close($del);
 
-    // 8. Hapus gambar hanya jika artikel berhasil dihapus
-    if ($berhasil && !empty($row['gambar'])) {
-        delete_uploaded_image(
-            $row['gambar'],
-            __DIR__ . '/../uploads'
+    if ($jumlah_dihapus !== 1) {
+        throw new RuntimeException(
+            'Delete affected rows tidak sesuai: ' . $jumlah_dihapus
         );
     }
+
+    // 9. Simpan perubahan database
+    if (!mysqli_commit($koneksi)) {
+        throw new RuntimeException(
+            'Delete commit failed: ' . mysqli_error($koneksi)
+        );
+    }
+
+    $berhasil = true;
+
+} catch (Throwable $e) {
+
+    mysqli_rollback($koneksi);
+
+    error_log(
+        'WargaNet delete article error: ' . $e->getMessage()
+    );
 }
 
-// 9. Kembali ke halaman artikel penulis
+// 10. Hapus gambar hanya jika artikel berhasil dihapus
+if ($berhasil && $gambar_lama !== null && $gambar_lama !== '') {
+    delete_uploaded_image(
+        $gambar_lama,
+        __DIR__ . '/../uploads'
+    );
+}
+
+// 11. Kembali ke halaman artikel penulis
 header('Location: index.php');
 exit;

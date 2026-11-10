@@ -1,4 +1,3 @@
-
 <?php
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 

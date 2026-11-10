@@ -1,4 +1,3 @@
-
 <?php
 // ==========================================
 // 1. PENGATURAN SESSION DAN KONEKSI
@@ -17,6 +16,7 @@ session_set_cookie_params([
 session_start();
 
 require_once __DIR__ . '/../includes/security.php';
+require_once __DIR__ . '/../includes/tampilan.php';
 require_once __DIR__ . '/../koneksi.php';
 
 

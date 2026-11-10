@@ -1,4 +1,3 @@
-```php
 <?php
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 
@@ -13,6 +12,7 @@ session_set_cookie_params([
 session_start();
 
 require_once __DIR__ . '/includes/security.php';
+require __DIR__ . '/includes/tampilan.php'; 
 require_once __DIR__ . '/koneksi.php';
 
 // ---------- Validasi session pengguna ----------
@@ -437,4 +437,3 @@ if ($stmt) {
 
 </body>
 </html>
-```

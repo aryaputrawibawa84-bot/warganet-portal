@@ -1,4 +1,3 @@
-
 <?php
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 
@@ -9,6 +8,7 @@ session_set_cookie_params([
     'httponly' => true,
     'samesite' => 'Lax'
 ]);
+
 session_start();
 
 require_once __DIR__ . '/../includes/security.php';
@@ -39,68 +39,107 @@ if ($id === null) {
     exit;
 }
 
-// Ambil nama gambar artikel
-$stmt = mysqli_prepare(
-    $koneksi,
-    'SELECT gambar FROM artikel WHERE id_artikel = ? LIMIT 1'
-);
+$gambar = null;
+$berhasil = false;
 
-if (!$stmt) {
-    error_log('WargaNet: gagal menyiapkan query SELECT artikel.');
-    header('Location: index.php');
-    exit;
-}
+try {
+    // Mulai transaksi database
+    if (!mysqli_begin_transaction($koneksi)) {
+        throw new RuntimeException('Gagal memulai transaksi database.');
+    }
 
-mysqli_stmt_bind_param($stmt, 'i', $id);
+    // Ambil nama gambar artikel
+    $stmt = mysqli_prepare(
+        $koneksi,
+        'SELECT gambar FROM artikel WHERE id_artikel = ? LIMIT 1'
+    );
 
-if (!mysqli_stmt_execute($stmt)) {
-    error_log('WargaNet: gagal mengambil data gambar artikel.');
+    if (!$stmt) {
+        throw new RuntimeException('Gagal menyiapkan query SELECT artikel.');
+    }
+
+    if (!mysqli_stmt_bind_param($stmt, 'i', $id)) {
+        mysqli_stmt_close($stmt);
+        throw new RuntimeException('Gagal mengikat parameter SELECT artikel.');
+    }
+
+    if (!mysqli_stmt_execute($stmt)) {
+        mysqli_stmt_close($stmt);
+        throw new RuntimeException('Gagal mengambil data artikel.');
+    }
+
+    $result = mysqli_stmt_get_result($stmt);
+
+    if (!$result) {
+        mysqli_stmt_close($stmt);
+        throw new RuntimeException('Gagal memperoleh hasil query artikel.');
+    }
+
+    $row = mysqli_fetch_assoc($result);
+
     mysqli_stmt_close($stmt);
-    header('Location: index.php');
-    exit;
-}
 
-$res = mysqli_stmt_get_result($stmt);
-$row = $res ? mysqli_fetch_assoc($res) : null;
+    // Pastikan artikel ditemukan
+    if (!$row) {
+        mysqli_rollback($koneksi);
+        header('Location: index.php');
+        exit;
+    }
 
-mysqli_stmt_close($stmt);
+    $gambar = $row['gambar'] ?? null;
 
-// Artikel tidak ditemukan atau hasil query tidak tersedia
-if (!$row) {
-    header('Location: index.php');
-    exit;
-}
+    // Hapus artikel dari database
+    $del = mysqli_prepare(
+        $koneksi,
+        'DELETE FROM artikel WHERE id_artikel = ?'
+    );
 
-// Hapus data artikel dari database
-$del = mysqli_prepare(
-    $koneksi,
-    'DELETE FROM artikel WHERE id_artikel = ?'
-);
+    if (!$del) {
+        throw new RuntimeException('Gagal menyiapkan query DELETE artikel.');
+    }
 
-if (!$del) {
-    error_log('WargaNet: gagal menyiapkan query DELETE artikel.');
-    header('Location: index.php');
-    exit;
-}
+    if (!mysqli_stmt_bind_param($del, 'i', $id)) {
+        mysqli_stmt_close($del);
+        throw new RuntimeException('Gagal mengikat parameter DELETE artikel.');
+    }
 
-mysqli_stmt_bind_param($del, 'i', $id);
-$ok = mysqli_stmt_execute($del);
+    if (!mysqli_stmt_execute($del)) {
+        mysqli_stmt_close($del);
+        throw new RuntimeException('Gagal menghapus artikel dari database.');
+    }
 
-if (!$ok) {
-    error_log('WargaNet: gagal menghapus artikel.');
+    // Pastikan tepat satu artikel terhapus
+    $affected_rows = mysqli_stmt_affected_rows($del);
+
     mysqli_stmt_close($del);
-    header('Location: index.php');
-    exit;
+
+    if ($affected_rows !== 1) {
+        throw new RuntimeException('Jumlah artikel yang terhapus tidak sesuai.');
+    }
+
+    // Simpan perubahan database
+    if (!mysqli_commit($koneksi)) {
+        throw new RuntimeException('Gagal menyimpan transaksi penghapusan.');
+    }
+
+    $berhasil = true;
+
+} catch (Throwable $e) {
+    // Batalkan transaksi jika masih berjalan
+    mysqli_rollback($koneksi);
+
+    error_log(
+        'WargaNet admin/hapus.php: ' . $e->getMessage()
+    );
 }
 
-mysqli_stmt_close($del);
+// Hapus gambar setelah artikel berhasil dihapus dari database
+if ($berhasil && !empty($gambar)) {
+    $upload_dir = __DIR__ . '/../uploads';
 
-// Hapus gambar jika data artikel berhasil dihapus
-$upload_dir = __DIR__ . '/../uploads';
-
-if (!empty($row['gambar'])) {
-    delete_uploaded_image($row['gambar'], $upload_dir);
+    delete_uploaded_image($gambar, $upload_dir);
 }
 
+// Kembali ke halaman daftar artikel
 header('Location: index.php');
 exit;

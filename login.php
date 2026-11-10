@@ -1,4 +1,3 @@
-
 <?php
 // 1. Pengaturan session cookie
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
