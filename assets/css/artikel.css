@@ -1,0 +1,102 @@
+/* ==========================================================
+   WargaNet — Tipografi isi artikel (dipakai bersama)
+   - Halaman baca  : detail.php  (.content-text)
+   - Editor artikel: admin & penulis (.ql-editor)
+   Satu sumber aturan supaya tampilan editor = tampilan hasil.
+   Mendukung tema gelap & terang lewat html[data-bs-theme].
+   ========================================================== */
+
+/* ---------- Token ---------- */
+:root {
+  --wn-art-size: 18px;
+  --wn-art-leading: 1.9;
+  --wn-art-text: #CBD5E1;
+  --wn-art-head: #F8FAFC;
+  --wn-art-link: #60A5FA;
+  --wn-art-quote-bg: rgba(59, 130, 246, .08);
+  --wn-art-quote-line: #3B82F6;
+
+  /* Daftar font (nama kelas = ql-font-<nama>) */
+  --wn-font-poppins: 'Poppins', 'Inter', system-ui, sans-serif;
+  --wn-font-roboto: 'Roboto', 'Inter', system-ui, sans-serif;
+  --wn-font-montserrat: 'Montserrat', 'Inter', system-ui, sans-serif;
+  --wn-font-merriweather: 'Merriweather', Georgia, 'Times New Roman', serif;
+  --wn-font-lora: 'Lora', Georgia, 'Times New Roman', serif;
+  --wn-font-playfair: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --wn-font-serif: Georgia, 'Times New Roman', serif;
+  --wn-font-monospace: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Courier New', monospace;
+}
+html[data-bs-theme="light"] {
+  --wn-art-text: #334155;
+  --wn-art-head: #0F172A;
+  --wn-art-link: #1D4ED8;
+  --wn-art-quote-bg: rgba(37, 99, 235, .07);
+  --wn-art-quote-line: #2563EB;
+}
+@media (max-width: 768px) {
+  :root { --wn-art-size: 16px; --wn-art-leading: 1.8; }
+}
+
+/* ---------- Halaman baca ---------- */
+.content-text {
+  color: var(--wn-art-text);
+  font-family: var(--wn-font, 'Inter', sans-serif);
+  font-size: var(--wn-art-size);
+  line-height: var(--wn-art-leading);
+  overflow-wrap: break-word;
+}
+.content-text p { margin-bottom: 1.4rem; }
+.content-text h2 { color: var(--wn-art-head); font-size: 1.65rem; font-weight: 700; margin: 2rem 0 1rem; line-height: 1.35; }
+.content-text h3 { color: var(--wn-art-head); font-size: 1.35rem; font-weight: 700; margin: 1.6rem 0 .8rem; line-height: 1.4; }
+.content-text strong, .content-text b { color: var(--wn-art-head); font-weight: 700; }
+.content-text em, .content-text i { font-style: italic; }
+.content-text u { text-decoration: underline; text-underline-offset: 3px; }
+.content-text s { text-decoration: line-through; }
+.content-text a { color: var(--wn-art-link); text-decoration: underline; overflow-wrap: anywhere; }
+.content-text blockquote {
+  margin: 1.5rem 0; padding: .7rem 1.2rem; color: var(--wn-art-text);
+  border-left: 4px solid var(--wn-art-quote-line); background: var(--wn-art-quote-bg); border-radius: 0 8px 8px 0;
+}
+.content-text ul, .content-text ol { margin: 1rem 0 1.5rem; padding-left: 2rem; }
+.content-text li { margin-bottom: .45rem; padding-left: .2rem; }
+@media (max-width: 768px) {
+  .content-text h2 { font-size: 1.4rem; }
+  .content-text h3 { font-size: 1.2rem; }
+}
+
+/* ---------- Perataan ---------- */
+.content-text .ql-align-center, .ql-editor .ql-align-center { text-align: center; }
+.content-text .ql-align-right, .ql-editor .ql-align-right { text-align: right; }
+.content-text .ql-align-justify, .ql-editor .ql-align-justify { text-align: justify; }
+
+/* ---------- Jenis font (editor + halaman baca) ---------- */
+.content-text .ql-font-poppins, .ql-editor .ql-font-poppins { font-family: var(--wn-font-poppins); }
+.content-text .ql-font-roboto, .ql-editor .ql-font-roboto { font-family: var(--wn-font-roboto); }
+.content-text .ql-font-montserrat, .ql-editor .ql-font-montserrat { font-family: var(--wn-font-montserrat); }
+.content-text .ql-font-merriweather, .ql-editor .ql-font-merriweather { font-family: var(--wn-font-merriweather); }
+.content-text .ql-font-lora, .ql-editor .ql-font-lora { font-family: var(--wn-font-lora); }
+.content-text .ql-font-playfair, .ql-editor .ql-font-playfair { font-family: var(--wn-font-playfair); }
+.content-text .ql-font-serif, .ql-editor .ql-font-serif { font-family: var(--wn-font-serif); }
+.content-text .ql-font-monospace, .ql-editor .ql-font-monospace { font-family: var(--wn-font-monospace); font-size: .92em; }
+
+/* ---------- Ukuran huruf (px) ---------- */
+.content-text .ql-size-12px, .ql-editor .ql-size-12px { font-size: 12px; }
+.content-text .ql-size-14px, .ql-editor .ql-size-14px { font-size: 14px; }
+.content-text .ql-size-16px, .ql-editor .ql-size-16px { font-size: 16px; }
+.content-text .ql-size-20px, .ql-editor .ql-size-20px { font-size: 20px; }
+.content-text .ql-size-24px, .ql-editor .ql-size-24px { font-size: 24px; }
+.content-text .ql-size-28px, .ql-editor .ql-size-28px { font-size: 28px; }
+.content-text .ql-size-32px, .ql-editor .ql-size-32px { font-size: 32px; }
+.content-text .ql-size-36px, .ql-editor .ql-size-36px { font-size: 36px; }
+.content-text .ql-size-48px, .ql-editor .ql-size-48px { font-size: 48px; line-height: 1.25; }
+/* Ukuran lama (artikel yang sudah tersimpan sebelumnya) tetap tampil sama */
+.content-text .ql-size-small, .ql-editor .ql-size-small { font-size: .75em; }
+.content-text .ql-size-large, .ql-editor .ql-size-large { font-size: 1.5em; }
+.content-text .ql-size-huge, .ql-editor .ql-size-huge { font-size: 2.5em; }
+/* Di layar kecil, ukuran besar dikecilkan agar tidak memecah tata letak */
+@media (max-width: 576px) {
+  .content-text .ql-size-48px, .ql-editor .ql-size-48px { font-size: 34px; }
+  .content-text .ql-size-36px, .ql-editor .ql-size-36px { font-size: 29px; }
+  .content-text .ql-size-32px, .ql-editor .ql-size-32px { font-size: 27px; }
+  .content-text .ql-size-huge, .ql-editor .ql-size-huge { font-size: 2em; }
+}

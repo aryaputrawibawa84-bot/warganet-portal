@@ -16,7 +16,6 @@ session_set_cookie_params([
 session_start();
 
 require_once __DIR__ . '/../includes/security.php';
-require_once __DIR__ . '/../includes/tampilan.php';
 require_once __DIR__ . '/../koneksi.php';
 
 // ========================================
@@ -294,6 +293,16 @@ if (
 <head>
     <meta charset="UTF-8">
     <meta name="theme-color" content="#0B1120">
+    <!-- Terapkan tema tersimpan sebelum halaman digambar (mencegah kedipan) -->
+    <script>
+        (function () {
+            var t = 'dark';
+            try { t = localStorage.getItem('wn-theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
+            document.documentElement.setAttribute('data-bs-theme', t);
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', t === 'light' ? '#F3F6FC' : '#0B1120');
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Tulis Berita Baru - Ruang Penulis WargaNet</title>
@@ -331,202 +340,16 @@ if (
         rel="stylesheet"
     >
 
-    <script>
-        document.documentElement.classList.add('js');
-    </script>
-
-    <style>
-        .editor-wrapper {
-            width: 100%;
-        }
-
-        #editor-toolbar.ql-toolbar.ql-snow {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 5px;
-            padding: 12px;
-            background: #1e293b !important;
-            border: 1px solid #334155 !important;
-            border-radius: 12px 12px 0 0;
-        }
-
-        #editor-toolbar .ql-formats {
-            display: inline-flex;
-            align-items: center;
-            margin-right: 8px;
-            padding-right: 8px;
-            border-right: 1px solid #475569;
-        }
-
-        #editor-toolbar .ql-formats:last-child {
-            border-right: none;
-        }
-
-        #editor-container.ql-container.ql-snow {
-            background: #0f172a !important;
-            color: #e2e8f0;
-            border: 1px solid #334155 !important;
-            border-top: none !important;
-            border-radius: 0 0 12px 12px;
-            font-family: Inter, sans-serif;
-            font-size: 16px;
-        }
-
-        #editor-container .ql-editor {
-            min-height: 380px;
-            padding: 24px;
-            color: #e2e8f0;
-            line-height: 1.85;
-            overflow-wrap: break-word;
-        }
-
-        #editor-container .ql-editor.ql-blank::before {
-            left: 24px;
-            color: #94a3b8;
-            font-style: normal;
-        }
-
-        #editor-toolbar .ql-stroke {
-            stroke: #cbd5e1;
-        }
-
-        #editor-toolbar .ql-fill {
-            fill: #cbd5e1;
-        }
-
-        #editor-toolbar .ql-picker {
-            color: #e2e8f0;
-        }
-
-        #editor-toolbar .ql-picker-label {
-            border-radius: 6px;
-        }
-
-        #editor-toolbar .ql-picker-options {
-            background: #1e293b !important;
-            border: 1px solid #475569 !important;
-            border-radius: 8px;
-        }
-
-        #editor-toolbar .ql-picker-item {
-            color: #e2e8f0;
-        }
-
-        #editor-toolbar button:hover,
-        #editor-toolbar button.ql-active,
-        #editor-toolbar .ql-picker-label:hover,
-        #editor-toolbar .ql-picker-label.ql-active {
-            color: #60a5fa;
-        }
-
-        #editor-toolbar button:hover .ql-stroke,
-        #editor-toolbar button.ql-active .ql-stroke {
-            stroke: #60a5fa;
-        }
-
-        #editor-toolbar button:hover .ql-fill,
-        #editor-toolbar button.ql-active .ql-fill {
-            fill: #60a5fa;
-        }
-
-        #editor-container .ql-editor h2 {
-            margin: 24px 0 12px;
-            font-size: 26px;
-            font-weight: 700;
-            line-height: 1.4;
-        }
-
-        #editor-container .ql-editor h3 {
-            margin: 20px 0 10px;
-            font-size: 21px;
-            font-weight: 700;
-            line-height: 1.5;
-        }
-
-        #editor-container .ql-editor p {
-            margin-bottom: 12px;
-        }
-
-        #editor-container .ql-editor blockquote {
-            margin: 18px 0;
-            padding: 12px 18px;
-            border-left: 4px solid #3b82f6;
-            background: rgba(59, 130, 246, 0.08);
-            color: #cbd5e1;
-        }
-
-        #editor-container .ql-editor a {
-            color: #60a5fa;
-            text-decoration: underline;
-        }
-
-        #editor-container .ql-editor ul,
-        #editor-container .ql-editor ol {
-            padding-left: 1.5em;
-            margin-bottom: 14px;
-        }
-
-        #editor-container .ql-editor .ql-font-serif {
-            font-family: Georgia, serif;
-        }
-
-        #editor-container .ql-editor .ql-font-monospace {
-            font-family: monospace;
-        }
-
-        #editor-container .ql-editor .ql-size-small {
-            font-size: 0.75em;
-        }
-
-        #editor-container .ql-editor .ql-size-large {
-            font-size: 1.5em;
-        }
-
-        #editor-container .ql-editor .ql-size-huge {
-            font-size: 2.5em;
-        }
-
-        .editor-keterangan {
-            color: #94a3b8;
-            font-size: 13px;
-        }
-
-        .editor-card {
-            border: 1px solid rgba(148, 163, 184, 0.15);
-            background: #172235;
-        }
-
-        #editor-container:focus-within {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
-        }
-
-        @media (max-width: 768px) {
-            #editor-toolbar.ql-toolbar.ql-snow {
-                padding: 8px;
-                gap: 2px;
-            }
-
-            #editor-toolbar .ql-formats {
-                margin-right: 3px;
-                padding-right: 3px;
-            }
-
-            #editor-container .ql-editor {
-                min-height: 280px;
-                padding: 16px;
-            }
-
-            #editor-container .ql-editor.ql-blank::before {
-                left: 16px;
-            }
-
-            .card-body {
-                padding: 18px !important;
-            }
-        }
-    </style>
+    <!-- Tipografi artikel (font & ukuran) + gaya editor, mengikuti tema gelap/terang -->
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Montserrat:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Poppins:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link
+        rel="stylesheet"
+        href="../assets/css/artikel.css?v=<?= (int) @filemtime(__DIR__ . '/../assets/css/artikel.css'); ?>"
+    >
+    <link
+        rel="stylesheet"
+        href="../assets/css/editor.css?v=<?= (int) @filemtime(__DIR__ . '/../assets/css/editor.css'); ?>"
+    >
 </head>
 
 <body class="wn-panel">
@@ -743,18 +566,9 @@ if (
 
                                         <span class="ql-formats">
 
-                                            <select class="ql-font">
-                                                <option selected></option>
-                                                <option value="serif"></option>
-                                                <option value="monospace"></option>
-                                            </select>
+                                            <select class="ql-font"></select>
 
-                                            <select class="ql-size">
-                                                <option value="small"></option>
-                                                <option selected></option>
-                                                <option value="large"></option>
-                                                <option value="huge"></option>
-                                            </select>
+                                            <select class="ql-size"></select>
 
                                         </span>
 
@@ -896,6 +710,9 @@ if (
 
     <!-- QUILL JS -->
     <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+
+    <!-- FONT & UKURAN HURUF EDITOR -->
+    <script src="../assets/js/editor.js?v=<?= (int) @filemtime(__DIR__ . '/../assets/js/editor.js'); ?>"></script>
 
     <!-- INISIALISASI QUILL -->
     <script>

@@ -1,0 +1,149 @@
+/* ==========================================================
+   WargaNet — Editor artikel (Quill) untuk admin & penulis
+   Dipakai: admin/tambah, admin/edit, penulis/tambah, penulis/edit
+   Mengikuti tema gelap/terang lewat html[data-bs-theme].
+   Muat SESUDAH quill.snow.css dan artikel.css.
+   ========================================================== */
+
+:root {
+  --wn-ed-toolbar: #1E293B;
+  --wn-ed-bg: #0F172A;
+  --wn-ed-border: #334155;
+  --wn-ed-divider: #475569;
+  --wn-ed-text: #E2E8F0;
+  --wn-ed-icon: #CBD5E1;
+  --wn-ed-accent: #60A5FA;
+  --wn-ed-muted: #94A3B8;
+  --wn-ed-pop: #1E293B;
+  --wn-ed-hover: rgba(148, 163, 184, .16);
+  --wn-ed-card: #172235;
+}
+html[data-bs-theme="light"] {
+  --wn-ed-toolbar: #F1F5F9;
+  --wn-ed-bg: #FFFFFF;
+  --wn-ed-border: #CBD5E1;
+  --wn-ed-divider: #CBD5E1;
+  --wn-ed-text: #1E293B;
+  --wn-ed-icon: #475569;
+  --wn-ed-accent: #2563EB;
+  --wn-ed-muted: #64748B;
+  --wn-ed-pop: #FFFFFF;
+  --wn-ed-hover: rgba(15, 23, 42, .07);
+  --wn-ed-card: #FFFFFF;
+}
+
+.editor-wrapper { width: 100%; }
+.editor-card { background: var(--wn-ed-card); border: 1px solid var(--wn-border, rgba(148, 163, 184, .15)); }
+.editor-keterangan { color: var(--wn-ed-muted); font-size: 13px; }
+
+/* ---------- Toolbar ---------- */
+#editor-toolbar.ql-toolbar.ql-snow {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; padding: 10px 12px;
+  background: var(--wn-ed-toolbar); border: 1px solid var(--wn-ed-border); border-radius: 12px 12px 0 0;
+  position: sticky; top: 0; z-index: 5;
+}
+#editor-toolbar .ql-formats {
+  display: inline-flex; align-items: center; margin: 0 6px 0 0; padding-right: 8px; border-right: 1px solid var(--wn-ed-divider);
+}
+#editor-toolbar .ql-formats:last-child { border-right: 0; margin-right: 0; padding-right: 0; }
+
+#editor-toolbar .ql-stroke { stroke: var(--wn-ed-icon); }
+#editor-toolbar .ql-fill, #editor-toolbar .ql-stroke.ql-fill { fill: var(--wn-ed-icon); }
+#editor-toolbar .ql-picker { color: var(--wn-ed-text); }
+#editor-toolbar button { border-radius: 6px; }
+#editor-toolbar button:hover, #editor-toolbar .ql-picker-label:hover { background: var(--wn-ed-hover); }
+#editor-toolbar button:hover, #editor-toolbar button.ql-active,
+#editor-toolbar .ql-picker-label:hover, #editor-toolbar .ql-picker-label.ql-active,
+#editor-toolbar .ql-picker-item:hover, #editor-toolbar .ql-picker-item.ql-selected { color: var(--wn-ed-accent); }
+#editor-toolbar button:hover .ql-stroke, #editor-toolbar button.ql-active .ql-stroke,
+#editor-toolbar .ql-picker-label:hover .ql-stroke, #editor-toolbar .ql-picker-label.ql-active .ql-stroke,
+#editor-toolbar .ql-picker-item:hover .ql-stroke, #editor-toolbar .ql-picker-item.ql-selected .ql-stroke { stroke: var(--wn-ed-accent); }
+#editor-toolbar button:hover .ql-fill, #editor-toolbar button.ql-active .ql-fill,
+#editor-toolbar .ql-picker-label:hover .ql-fill, #editor-toolbar .ql-picker-label.ql-active .ql-fill { fill: var(--wn-ed-accent); }
+#editor-toolbar .ql-picker-label { border-radius: 6px; }
+#editor-toolbar .ql-picker.ql-expanded .ql-picker-label { border-color: var(--wn-ed-border); color: var(--wn-ed-accent); }
+#editor-toolbar .ql-picker.ql-expanded .ql-picker-label .ql-stroke { stroke: var(--wn-ed-accent); }
+#editor-toolbar .ql-picker-options {
+  background: var(--wn-ed-pop); border: 1px solid var(--wn-ed-border) !important; border-radius: 10px;
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .5); padding: 6px;
+}
+#editor-toolbar .ql-picker-item { border-radius: 6px; padding: 4px 8px; color: var(--wn-ed-text); }
+
+/* ---------- Dropdown FONT & UKURAN ---------- */
+#editor-toolbar .ql-picker.ql-font { width: 138px; }
+#editor-toolbar .ql-picker.ql-size { width: 82px; }
+#editor-toolbar .ql-picker.ql-header { width: 104px; }
+#editor-toolbar .ql-picker.ql-font .ql-picker-options { max-height: 300px; overflow-y: auto; }
+#editor-toolbar .ql-picker.ql-size .ql-picker-options { max-height: 300px; overflow-y: auto; }
+
+/* Label font — default (tanpa data-value) = Inter */
+#editor-toolbar .ql-picker.ql-font .ql-picker-label::before,
+#editor-toolbar .ql-picker.ql-font .ql-picker-item::before { content: 'Inter'; font-family: 'Inter', sans-serif; }
+#editor-toolbar .ql-picker.ql-font [data-value="poppins"]::before { content: 'Poppins'; font-family: var(--wn-font-poppins); }
+#editor-toolbar .ql-picker.ql-font [data-value="roboto"]::before { content: 'Roboto'; font-family: var(--wn-font-roboto); }
+#editor-toolbar .ql-picker.ql-font [data-value="montserrat"]::before { content: 'Montserrat'; font-family: var(--wn-font-montserrat); }
+#editor-toolbar .ql-picker.ql-font [data-value="merriweather"]::before { content: 'Merriweather'; font-family: var(--wn-font-merriweather); }
+#editor-toolbar .ql-picker.ql-font [data-value="lora"]::before { content: 'Lora'; font-family: var(--wn-font-lora); }
+#editor-toolbar .ql-picker.ql-font [data-value="playfair"]::before { content: 'Playfair Display'; font-family: var(--wn-font-playfair); }
+#editor-toolbar .ql-picker.ql-font [data-value="serif"]::before { content: 'Georgia'; font-family: var(--wn-font-serif); }
+#editor-toolbar .ql-picker.ql-font [data-value="monospace"]::before { content: 'Monospace'; font-family: var(--wn-font-monospace); }
+
+/* Label ukuran — default (tanpa data-value) = Normal */
+#editor-toolbar .ql-picker.ql-size .ql-picker-label::before,
+#editor-toolbar .ql-picker.ql-size .ql-picker-item::before { content: 'Normal'; font-size: 14px !important; }
+#editor-toolbar .ql-picker.ql-size [data-value="12px"]::before { content: '12 px'; }
+#editor-toolbar .ql-picker.ql-size [data-value="14px"]::before { content: '14 px'; }
+#editor-toolbar .ql-picker.ql-size [data-value="16px"]::before { content: '16 px'; }
+#editor-toolbar .ql-picker.ql-size [data-value="20px"]::before { content: '20 px'; }
+#editor-toolbar .ql-picker.ql-size [data-value="24px"]::before { content: '24 px'; }
+#editor-toolbar .ql-picker.ql-size [data-value="28px"]::before { content: '28 px'; }
+#editor-toolbar .ql-picker.ql-size [data-value="32px"]::before { content: '32 px'; }
+#editor-toolbar .ql-picker.ql-size [data-value="36px"]::before { content: '36 px'; }
+#editor-toolbar .ql-picker.ql-size [data-value="48px"]::before { content: '48 px'; }
+/* Ukuran lama: tetap terbaca benar di label saat kursor di teks lama */
+#editor-toolbar .ql-picker.ql-size [data-value="small"]::before { content: 'Kecil'; }
+#editor-toolbar .ql-picker.ql-size [data-value="large"]::before { content: 'Besar'; }
+#editor-toolbar .ql-picker.ql-size [data-value="huge"]::before { content: 'Sangat besar'; }
+
+/* ---------- Area tulis ---------- */
+#editor-container.ql-container.ql-snow {
+  background: var(--wn-ed-bg); color: var(--wn-ed-text); border: 1px solid var(--wn-ed-border); border-top: 0;
+  border-radius: 0 0 12px 12px; font-family: var(--wn-font, 'Inter', sans-serif); font-size: var(--wn-art-size);
+  transition: border-color .2s, box-shadow .2s;
+}
+#editor-container.ql-container.ql-snow:focus-within { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59, 130, 246, .14); }
+#editor-container .ql-editor {
+  min-height: 380px; padding: 24px; color: var(--wn-ed-text); background: transparent;
+  line-height: var(--wn-art-leading); overflow-wrap: break-word;
+}
+#editor-container .ql-editor.ql-blank::before { left: 24px; right: 24px; color: var(--wn-ed-muted); font-style: normal; }
+#editor-container .ql-editor p { margin-bottom: 12px; }
+#editor-container .ql-editor h2 { margin: 24px 0 12px; font-size: 26px; font-weight: 700; line-height: 1.4; color: var(--wn-art-head); }
+#editor-container .ql-editor h3 { margin: 20px 0 10px; font-size: 21px; font-weight: 700; line-height: 1.5; color: var(--wn-art-head); }
+#editor-container .ql-editor blockquote {
+  margin: 18px 0; padding: 12px 18px; border-left: 4px solid var(--wn-art-quote-line);
+  background: var(--wn-art-quote-bg); color: var(--wn-art-text); border-radius: 0 8px 8px 0;
+}
+#editor-container .ql-editor a { color: var(--wn-art-link); text-decoration: underline; }
+#editor-container .ql-editor ul, #editor-container .ql-editor ol { padding-left: 1.5em; margin-bottom: 14px; }
+
+/* Tooltip tautan */
+#editor-container .ql-tooltip {
+  background: var(--wn-ed-pop); color: var(--wn-ed-text); border: 1px solid var(--wn-ed-border);
+  border-radius: 10px; box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .5); z-index: 10;
+}
+#editor-container .ql-tooltip input[type=text] {
+  background: var(--wn-ed-bg); color: var(--wn-ed-text); border: 1px solid var(--wn-ed-border); border-radius: 6px;
+}
+#editor-container .ql-tooltip a { color: var(--wn-ed-accent); }
+#editor-container .ql-tooltip a.ql-preview { color: var(--wn-ed-accent); }
+
+/* ---------- Layar kecil ---------- */
+@media (max-width: 768px) {
+  #editor-toolbar.ql-toolbar.ql-snow { padding: 8px; gap: 4px 2px; position: static; }
+  #editor-toolbar .ql-formats { margin-right: 3px; padding-right: 5px; }
+  #editor-toolbar .ql-picker.ql-font { width: 118px; }
+  #editor-container .ql-editor { min-height: 280px; padding: 16px; }
+  #editor-container .ql-editor.ql-blank::before { left: 16px; right: 16px; }
+  .card-body { padding: 18px !important; }
+}

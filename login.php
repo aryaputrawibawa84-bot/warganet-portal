@@ -182,6 +182,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="theme-color" content="#0B1120">
+    <!-- Terapkan tema tersimpan sebelum halaman digambar (mencegah kedipan) -->
+    <script>
+        (function () {
+            var t = 'dark';
+            try { t = localStorage.getItem('wn-theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
+            document.documentElement.setAttribute('data-bs-theme', t);
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', t === 'light' ? '#F3F6FC' : '#0B1120');
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Masuk - WargaNet</title>
@@ -196,10 +206,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="assets/css/warganet.css?v=<?= (int) @filemtime(__DIR__ . '/assets/css/warganet.css'); ?>">
-
-    <script>
-        document.documentElement.classList.add('js')
-    </script>
 </head>
 
 <body class="wn-auth">

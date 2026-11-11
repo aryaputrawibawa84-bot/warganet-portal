@@ -217,6 +217,16 @@ if (!$query_berita) {
 <head>
     <meta charset="UTF-8">
     <meta name="theme-color" content="#0B1120">
+    <!-- Terapkan tema tersimpan sebelum halaman digambar (mencegah kedipan) -->
+    <script>
+        (function () {
+            var t = 'dark';
+            try { t = localStorage.getItem('wn-theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
+            document.documentElement.setAttribute('data-bs-theme', t);
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', t === 'light' ? '#F3F6FC' : '#0B1120');
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>WargaNet - Portal Berita &amp; Komunitas</title>
@@ -243,10 +253,6 @@ if (!$query_berita) {
         rel="stylesheet"
         href="assets/css/warganet.css?v=<?= (int) @filemtime(__DIR__ . '/assets/css/warganet.css'); ?>"
     >
-
-    <script>
-        document.documentElement.classList.add('js');
-    </script>
 </head>
 
 <body class="wn-public">

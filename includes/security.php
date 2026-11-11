@@ -187,17 +187,49 @@ function sanitize_article_html(string $html): string
         'base'
     ];
 
+    // Daftar font & ukuran harus sama dengan assets/js/editor.js
+    // dan assets/css/artikel.css.
+    $allowedFonts = [
+        'serif',
+        'monospace',
+        'poppins',
+        'roboto',
+        'montserrat',
+        'merriweather',
+        'lora',
+        'playfair'
+    ];
+
+    // 'small', 'large', 'huge' = ukuran lama (artikel yang sudah tersimpan).
+    $allowedSizes = [
+        'small',
+        'large',
+        'huge',
+        '12px',
+        '14px',
+        '16px',
+        '20px',
+        '24px',
+        '28px',
+        '32px',
+        '36px',
+        '48px'
+    ];
+
     $allowedClasses = [
         'ql-align-center',
         'ql-align-right',
         'ql-align-justify',
-        'ql-font-serif',
-        'ql-font-monospace',
-        'ql-size-small',
-        'ql-size-large',
-        'ql-size-huge',
         'ql-ui'
     ];
+
+    foreach ($allowedFonts as $fontName) {
+        $allowedClasses[] = 'ql-font-' . $fontName;
+    }
+
+    foreach ($allowedSizes as $sizeName) {
+        $allowedClasses[] = 'ql-size-' . $sizeName;
+    }
 
     $allowedListTypes = [
         'ordered',

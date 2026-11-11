@@ -8,6 +8,69 @@
   var isPublic = body.classList.contains('wn-public');
   var isPanel = body.classList.contains('wn-panel');
 
+  /* ---------- Tema gelap / terang ----------
+     Pilihan disimpan di localStorage ('wn-theme'). Bawaan: gelap.
+     Tema awal diterapkan oleh skrip kecil di <head> setiap halaman (anti-kedip);
+     bagian ini hanya membuat tombol dan menangani klik. */
+  var root = d.documentElement;
+  var THEME_KEY = 'wn-theme';
+
+  function currentTheme() { return root.getAttribute('data-bs-theme') === 'light' ? 'light' : 'dark'; }
+
+  function syncThemeButtons() {
+    var light = currentTheme() === 'light';
+    d.querySelectorAll('.wn-theme-toggle').forEach(function (b) {
+      var label = light ? 'Ganti ke tema gelap' : 'Ganti ke tema terang';
+      b.setAttribute('aria-label', label);
+      b.setAttribute('title', label);
+      b.setAttribute('aria-pressed', light ? 'true' : 'false');
+    });
+    var meta = d.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', light ? '#F3F6FC' : '#0B1120');
+  }
+
+  function applyTheme(theme, save) {
+    theme = theme === 'light' ? 'light' : 'dark';
+    if (!reduce) {
+      root.classList.add('wn-theme-anim');
+      clearTimeout(applyTheme.t);
+      applyTheme.t = setTimeout(function () { root.classList.remove('wn-theme-anim'); }, 450);
+    }
+    root.setAttribute('data-bs-theme', theme);
+    if (save) { try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* mode privat: abaikan */ } }
+    syncThemeButtons();
+    window.dispatchEvent(new CustomEvent('wn:themechange', { detail: { theme: theme } }));
+  }
+
+  function makeThemeButton() {
+    var b = d.createElement('button');
+    b.type = 'button';
+    b.className = 'wn-theme-toggle';
+    b.innerHTML = '<i class="bi bi-sun-fill wn-ti-sun" aria-hidden="true"></i><i class="bi bi-moon-stars-fill wn-ti-moon" aria-hidden="true"></i>';
+    b.addEventListener('click', function () { applyTheme(currentTheme() === 'light' ? 'dark' : 'light', true); });
+    return b;
+  }
+
+  (function mountThemeToggle() {
+    var bar = d.querySelector('.navbar > .container, .navbar > .container-fluid');
+    var btn = makeThemeButton();
+    if (bar) {
+      // Di panel: tepat setelah "Halo, nama!". Di halaman publik: paling akhir di navbar.
+      var after = bar.querySelector('.navbar-text');
+      if (after) after.insertAdjacentElement('afterend', btn); else bar.appendChild(btn);
+    } else {
+      // Halaman login/daftar tidak punya navbar: tombol melayang di pojok kanan atas.
+      btn.classList.add('wn-theme-toggle--float');
+      body.appendChild(btn);
+    }
+    syncThemeButtons();
+  })();
+
+  // Sinkron antar tab: ubah tema di satu tab, tab lain ikut berubah.
+  window.addEventListener('storage', function (e) {
+    if (e.key === THEME_KEY) applyTheme(e.newValue === 'light' ? 'light' : 'dark', false);
+  });
+
   /* ---------- Toast kecil ---------- */
   function toast(msg, type) {
     var t = d.createElement('div');
@@ -241,31 +304,6 @@
     });
   });
 
-  /* ---------- Penghitung kata + tinggi otomatis pada isi artikel ---------- */
-  var ta = d.querySelector('textarea[name=isi_artikel]');
-  if (ta) {
-    var counter = d.createElement('small');
-    counter.className = 'wn-counter';
-    ta.insertAdjacentElement('afterend', counter);
-    var update = function () {
-      var words = (ta.value.trim().match(/\S+/g) || []).length;
-      counter.textContent = words + ' kata \u2022 \u00B1' + Math.max(1, Math.ceil(words / 200)) + ' menit baca';
-
-      // Ukur ulang tinggi TANPA membuat halaman melompat:
-      // simpan posisi scroll, batasi tinggi maksimal, lalu kembalikan posisinya.
-      var sx = window.scrollX, sy = window.scrollY, st = ta.scrollTop;
-      var maks = Math.round(window.innerHeight * 0.7);
-      ta.style.height = 'auto';
-      ta.style.height = Math.min(Math.max(ta.scrollHeight, 240), maks) + 'px';
-      ta.style.overflowY = ta.scrollHeight > maks ? 'auto' : 'hidden';
-      ta.scrollTop = st;
-      window.scrollTo(sx, sy);
-    };
-    ta.addEventListener('input', update);
-    update();
-  }
-
-  /* ---------- Dashboard: ikon sidebar, ikon brand, avatar pengguna ---------- */
   /* ---------- Penghitung karakter untuk textarea ber-maxlength (komentar) ---------- */
   d.querySelectorAll('textarea[maxlength]').forEach(function (t) {
     var max = parseInt(t.getAttribute('maxlength'), 10);
@@ -276,6 +314,7 @@
     t.addEventListener('input', upd);
     upd();
   });
+  /* ---------- Dashboard: ikon sidebar, ikon brand, avatar pengguna ---------- */
   if (isPanel) {
     var icons = { 'index.php': 'newspaper', 'kategori.php': 'tags', 'pengguna.php': 'people', 'logout.php': 'box-arrow-left' };
     d.querySelectorAll('.list-group-item').forEach(function (a) {
@@ -408,5 +447,4 @@
   }
   watchCounts();
 
-  window.WN = { toast: toast, confirm: confirmDialog };
 })();

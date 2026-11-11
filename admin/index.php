@@ -12,7 +12,6 @@ session_set_cookie_params([
 session_start();
 
 require_once __DIR__ . '/../includes/security.php';
-require_once __DIR__ . '/../includes/tampilan.php';
 require_once __DIR__ . '/../koneksi.php';
 
 // Validasi hak akses admin
@@ -343,6 +342,16 @@ $pesan_info = $daftar_pesan[$info] ?? null;
 
     <meta charset="UTF-8">
     <meta name="theme-color" content="#0B1120">
+    <!-- Terapkan tema tersimpan sebelum halaman digambar (mencegah kedipan) -->
+    <script>
+        (function () {
+            var t = 'dark';
+            try { t = localStorage.getItem('wn-theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
+            document.documentElement.setAttribute('data-bs-theme', t);
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', t === 'light' ? '#F3F6FC' : '#0B1120');
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Kelola Artikel - WargaNet Panel</title>
@@ -365,10 +374,6 @@ $pesan_info = $daftar_pesan[$info] ?? null;
     <link
         rel="stylesheet"
         href="../assets/css/warganet.css?v=<?= (int)@filemtime(__DIR__ . '/../assets/css/warganet.css'); ?>">
-
-    <script>
-        document.documentElement.classList.add('js');
-    </script>
 
 </head>
 

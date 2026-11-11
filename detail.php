@@ -13,7 +13,6 @@ session_set_cookie_params([
 session_start();
 
 require_once __DIR__ . '/includes/security.php';
-require_once __DIR__ . '/includes/tampilan.php';
 require_once __DIR__ . '/koneksi.php';
 
 // ---------- Validasi ID artikel ----------
@@ -467,6 +466,16 @@ $flash = $_GET['k'] ?? '';
 <head>
     <meta charset="UTF-8">
     <meta name="theme-color" content="#0B1120">
+    <!-- Terapkan tema tersimpan sebelum halaman digambar (mencegah kedipan) -->
+    <script>
+        (function () {
+            var t = 'dark';
+            try { t = localStorage.getItem('wn-theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
+            document.documentElement.setAttribute('data-bs-theme', t);
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', t === 'light' ? '#F3F6FC' : '#0B1120');
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title><?= e($data['judul']); ?> - WargaNet</title>
@@ -494,130 +503,12 @@ $flash = $_GET['k'] ?? '';
         href="assets/css/warganet.css?v=<?= (int) @filemtime(__DIR__ . '/assets/css/warganet.css'); ?>"
     >
 
-    <style>
-        .content-text {
-            color: #cbd5e1;
-            font-family: Inter, sans-serif;
-            font-size: 18px;
-            line-height: 1.9;
-            overflow-wrap: break-word;
-        }
-
-        .content-text p {
-            margin-bottom: 1.4rem;
-        }
-
-        .content-text h2 {
-            color: #f8fafc;
-            font-size: 1.65rem;
-            font-weight: 700;
-            margin: 2rem 0 1rem;
-        }
-
-        .content-text h3 {
-            color: #f8fafc;
-            font-size: 1.35rem;
-            font-weight: 700;
-            margin: 1.6rem 0 0.8rem;
-        }
-
-        .content-text strong,
-        .content-text b {
-            color: #f8fafc;
-            font-weight: 700;
-        }
-
-        .content-text em,
-        .content-text i {
-            font-style: italic;
-        }
-
-        .content-text u {
-            text-decoration: underline;
-            text-underline-offset: 3px;
-        }
-
-        .content-text s {
-            text-decoration: line-through;
-        }
-
-        .content-text a {
-            color: #60a5fa;
-            text-decoration: underline;
-            overflow-wrap: anywhere;
-        }
-
-        .content-text blockquote {
-            border-left: 4px solid #3b82f6;
-            margin: 1.5rem 0;
-            padding: 0.7rem 1.2rem;
-            color: #cbd5e1;
-            background: rgba(59, 130, 246, 0.08);
-            border-radius: 0 8px 8px 0;
-        }
-
-        .content-text ul,
-        .content-text ol {
-            margin: 1rem 0 1.5rem;
-            padding-left: 2rem;
-        }
-
-        .content-text li {
-            margin-bottom: 0.45rem;
-            padding-left: 0.2rem;
-        }
-
-        .content-text .ql-align-center {
-            text-align: center;
-        }
-
-        .content-text .ql-align-right {
-            text-align: right;
-        }
-
-        .content-text .ql-align-justify {
-            text-align: justify;
-        }
-
-        .content-text .ql-font-serif {
-            font-family: Georgia, serif;
-        }
-
-        .content-text .ql-font-monospace {
-            font-family: monospace;
-        }
-
-        .content-text .ql-size-small {
-            font-size: 0.75em;
-        }
-
-        .content-text .ql-size-large {
-            font-size: 1.5em;
-        }
-
-        .content-text .ql-size-huge {
-            font-size: 2.5em;
-        }
-
-        @media (max-width: 768px) {
-            .content-text {
-                font-size: 16px;
-                line-height: 1.8;
-            }
-
-            .content-text h2 {
-                font-size: 1.4rem;
-            }
-
-            .content-text h3 {
-                font-size: 1.2rem;
-            }
-        }
-    </style>
-
-    <script>
-        document.documentElement.classList.add('js');
-    </script>
+    <!-- Tipografi isi artikel (font & ukuran), mengikuti tema gelap/terang -->
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Montserrat:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Poppins:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link
+        rel="stylesheet"
+        href="assets/css/artikel.css?v=<?= (int) @filemtime(__DIR__ . '/assets/css/artikel.css'); ?>"
+    >
 </head>
 
 <body class="wn-public">
