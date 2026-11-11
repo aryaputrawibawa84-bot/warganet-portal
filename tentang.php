@@ -1,3 +1,4 @@
+
 <?php
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 
@@ -38,6 +39,33 @@ if ($role === 'admin') {
 } elseif ($role === 'penulis') {
     $link_dashboard = 'penulis/index.php';
 }
+
+// ========================================
+// KONFIGURASI WHATSAPP ADMIN
+// ========================================
+
+// Ganti dengan nomor WhatsApp resmi admin.
+// Gunakan format 62 tanpa tanda +, spasi, atau tanda hubung.
+$nomor_whatsapp_admin = '6289629602501';
+
+// Validasi nomor WhatsApp
+$nomor_whatsapp_admin = preg_replace(
+    '/\D+/',
+    '',
+    $nomor_whatsapp_admin
+);
+
+$whatsapp_valid = preg_match(
+    '/^62[0-9]{8,13}$/',
+    $nomor_whatsapp_admin
+) === 1;
+
+// Pesan otomatis untuk pengajuan menjadi penulis
+$pesan_whatsapp = 'Halo Admin WargaNet, saya ingin mengajukan permohonan menjadi penulis. Nama lengkap: ... Username WargaNet: ... Alasan ingin menjadi penulis: ...';
+
+$link_whatsapp = $whatsapp_valid
+    ? 'https://wa.me/' . $nomor_whatsapp_admin . '?text=' . rawurlencode($pesan_whatsapp)
+    : '';
 
 /**
  * Mengambil satu angka dari query statistik.
@@ -97,21 +125,37 @@ $stat_views = ambil_angka(
 <head>
     <meta charset="UTF-8">
     <meta name="theme-color" content="#0B1120">
-    <!-- Terapkan tema tersimpan sebelum halaman digambar (mencegah kedipan) -->
+
+    <!-- Terapkan tema tersimpan sebelum halaman digambar -->
     <script>
         (function () {
             var t = 'dark';
-            try { t = localStorage.getItem('wn-theme') === 'light' ? 'light' : 'dark'; } catch (e) {}
+
+            try {
+                t = localStorage.getItem('wn-theme') === 'light'
+                    ? 'light'
+                    : 'dark';
+            } catch (e) {}
+
             document.documentElement.setAttribute('data-bs-theme', t);
+
             var m = document.querySelector('meta[name="theme-color"]');
-            if (m) m.setAttribute('content', t === 'light' ? '#F3F6FC' : '#0B1120');
+
+            if (m) {
+                m.setAttribute(
+                    'content',
+                    t === 'light' ? '#F3F6FC' : '#0B1120'
+                );
+            }
         })();
     </script>
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Tentang Kami - WargaNet</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -145,6 +189,7 @@ $stat_views = ambil_angka(
             <div class="collapse navbar-collapse" id="navbarNav">
 
                 <ul class="navbar-nav me-auto">
+
                     <li class="nav-item">
                         <a class="nav-link" href="index.php">Beranda</a>
                     </li>
@@ -156,6 +201,7 @@ $stat_views = ambil_angka(
                     <li class="nav-item">
                         <a class="nav-link active text-white" href="tentang.php">Tentang Kami</a>
                     </li>
+
                 </ul>
 
                 <div class="d-flex gap-2">
@@ -172,6 +218,7 @@ $stat_views = ambil_angka(
                         <?php endif; ?>
 
                         <form action="logout.php" method="POST" class="d-inline">
+
                             <input
                                 type="hidden"
                                 name="csrf_token"
@@ -184,6 +231,7 @@ $stat_views = ambil_angka(
                             >
                                 Logout
                             </button>
+
                         </form>
 
                     <?php else : ?>
@@ -217,7 +265,7 @@ $stat_views = ambil_angka(
             </h1>
 
             <p class="wn-lead">
-                WargaNet adalah portal berita dan blog komunitas.
+                WargaNet adalah sebuah platform portal berita.
                 Informasi dari lingkungan sekitar dikumpulkan, dirapikan
                 per kategori, dan bisa dibaca kapan saja, tanpa tercecer
                 di grup chat.
@@ -265,20 +313,19 @@ $stat_views = ambil_angka(
             <div class="row align-items-center g-4">
 
                 <div class="col-lg-5">
+
                     <span class="wn-eyebrow">Latar belakang</span>
 
                     <h2 class="fw-bold mt-2 mb-0">
                         Kenapa WargaNet dibuat?
                     </h2>
+
                 </div>
 
                 <div class="col-lg-7 text-secondary" style="line-height: 1.8;">
 
                     <p class="mb-3">
-                        Pengumuman RT/RW, kabar sekolah, dan cerita organisasi
-                        biasanya dibagikan lewat grup chat. Pesannya cepat
-                        tenggelam, sulit dicari lagi, dan tidak semua orang
-                        ikut grupnya.
+                        Informasi dan berita terkini sering tersebar di berbagai sumber sehingga sulit ditemukan kembali. Pembaca membutuhkan sebuah portal berita yang dapat menyajikan informasi secara terpusat, terstruktur, dan mudah diakses kapan saja.
                     </p>
 
                     <p class="mb-0">
@@ -483,6 +530,7 @@ $stat_views = ambil_angka(
 
                 <div class="accordion wn-faq" id="faq">
 
+                    <!-- FAQ 1 -->
                     <div class="accordion-item">
 
                         <h3 class="accordion-header">
@@ -510,6 +558,7 @@ $stat_views = ambil_angka(
 
                     </div>
 
+                    <!-- FAQ 2 -->
                     <div class="accordion-item">
 
                         <h3 class="accordion-header">
@@ -529,15 +578,29 @@ $stat_views = ambil_angka(
                             data-bs-parent="#faq"
                         >
                             <div class="accordion-body">
-                                Daftar akun terlebih dahulu. Akun baru
-                                berperan sebagai pembaca; admin dapat
-                                mengubahnya menjadi penulis lewat menu
-                                Kelola Pengguna.
+                                Jika Anda ingin menjadi penulis di WargaNet,
+                                silakan hubungi admin melalui WhatsApp yang
+                                tersedia pada bagian pengajuan penulis di
+                                bawah halaman ini.
+
+                                Sampaikan nama lengkap, username akun
+                                WargaNet, dan alasan ingin bergabung sebagai
+                                penulis.
+
+                                Setelah menerima permintaan, admin akan
+                                melakukan pemeriksaan dan konfirmasi.
+                                Jika disetujui, admin akan mengubah hak akses
+                                akun Anda menjadi penulis.
+
+                                Setelah itu, Anda dapat login dan mulai
+                                mengirimkan artikel melalui menu penulis
+                                di WargaNet.
                             </div>
                         </div>
 
                     </div>
 
+                    <!-- FAQ 3 -->
                     <div class="accordion-item">
 
                         <h3 class="accordion-header">
@@ -565,6 +628,7 @@ $stat_views = ambil_angka(
 
                     </div>
 
+                    <!-- FAQ 4 -->
                     <div class="accordion-item">
 
                         <h3 class="accordion-header">
@@ -594,6 +658,67 @@ $stat_views = ambil_angka(
                 </div>
             </div>
         </div>
+
+        <!-- WHATSAPP ADMIN: PENGAJUAN PENULIS -->
+        <section class="about-card p-4 p-md-5 mb-5">
+
+            <div class="row align-items-center g-4">
+
+                <div class="col-lg-8">
+
+                    <div class="d-flex align-items-center gap-3 mb-3">
+
+                        <i class="bi bi-whatsapp text-success fs-2"></i>
+
+                        <h4 class="fw-bold mb-0">
+                            Ingin bergabung sebagai penulis?
+                        </h4>
+
+                    </div>
+
+                    <p class="mb-2" style="line-height: 1.8;">
+                        Tertarik membagikan berita dan informasi melalui
+                        WargaNet? Hubungi admin kami melalui WhatsApp
+                        untuk mengajukan permohonan menjadi penulis.
+                    </p>
+
+                    <p class="text-secondary small mb-0">
+                        Sertakan nama lengkap, username akun WargaNet,
+                        dan alasan ingin bergabung sebagai penulis.
+                        Admin akan memeriksa permohonan Anda sebelum
+                        memberikan akses penulis.
+                    </p>
+
+                </div>
+
+                <div class="col-lg-4 text-lg-end">
+
+                    <?php if ($whatsapp_valid) : ?>
+
+                        <a
+                            href="<?= e($link_whatsapp); ?>"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn btn-success btn-lg rounded-pill px-4"
+                        >
+                            <i class="bi bi-whatsapp me-2"></i>
+                            Hubungi Admin
+                        </a>
+
+                    <?php else : ?>
+
+                        <div class="alert alert-warning mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Nomor WhatsApp admin belum dikonfigurasi.
+                        </div>
+
+                    <?php endif; ?>
+
+                </div>
+
+            </div>
+
+        </section>
 
         <!-- CTA -->
         <?php if (!$sudah_login) : ?>

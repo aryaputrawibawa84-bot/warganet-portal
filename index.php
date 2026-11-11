@@ -342,7 +342,7 @@ if (!$query_berita) {
 
             <span class="wn-pill">
                 <span class="wn-dot"></span>
-                Portal berita &amp; komunitas warga
+                Portal Berita WargaNet
             </span>
 
             <h1 class="wn-title">
